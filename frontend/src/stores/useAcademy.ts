@@ -1,6 +1,10 @@
 import {defineStore} from 'pinia';
 import axios from 'axios';
 
+// En local usa el Flask de tu máquina; en Vercel se define VITE_API_URL
+// con la URL del backend desplegado en Render.
+const API_URL = import.meta.env.VITE_API_URL || 'http://127.0.0.1:5000';
+
 export interface Nivel {
     id: number;
     name: string;
@@ -17,7 +21,7 @@ export const useAcademyStore = defineStore('academy', {
     actions: {
         async fetchInfo(){
             try {
-                const response = await axios.get('http://127.0.0.1:5000/api/datos_academia');
+                const response = await axios.get(`${API_URL}/api/datos_academia`);
                 this.name = response.data.nombre;
                 this.tagline = response.data.biografia;
                 this.tiers = response.data.niveles;
