@@ -1,11 +1,18 @@
 import {defineStore} from 'pinia';
 import axios from 'axios';
 
+export interface Nivel {
+    id: number;
+    name: string;
+    price: number;
+    benefits: string;
+}
+
 export const useAcademyStore = defineStore('academy', {
     state: () => ({
         name: '',
         tagline: '',
-        tiers: [] as any[],
+        tiers: [] as Nivel[],
     }),
     actions: {
         async fetchInfo(){

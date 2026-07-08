@@ -35,12 +35,13 @@ onMounted(() => {
   font-family: sans-serif; 
   padding: 20px; 
 }
-.tiers-grid 
-{ 
-  display: flex; 
-  justify-content: center; 
-  gap: 20px; 
-  margin-top: 40px; 
+.tiers-grid
+{
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 40px;
 }
 .card 
 { 
