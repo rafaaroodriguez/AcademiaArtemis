@@ -20,8 +20,8 @@ onMounted(() => {
     <div class="tiers-grid">
       <div v-for="tier in academy.tiers" :key="tier.id" class="card">
         <h2>{{ tier.name }}</h2>
-        <p class="price">${{ tier.price }}</p>
-        <p>{{ tier.benefit }}</p>
+        <p class="price">{{ tier.price }}€</p>
+        <p>{{ tier.benefits }}</p>
         <button>Seleccionar</button>
       </div>
     </div>
