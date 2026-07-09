@@ -10,9 +10,9 @@ datos_academia = {
     "biografia": "academia 100% online con contenido para todos los niveles: ESO, Bachillerato y Universidad!",
     "niveles": 
         [
-            {"id": 1, "name": "ESO", "price": 5, "benefits": "Acceso a contenido sobre cursos de ESO"},
-            {"id": 2, "name": "Bachillerato", "price": 10, "benefits": "Acceso a contenido sobre cursos de Bachillerato"},
-            {"id": 3, "name": "Universidad", "price": 15, "benefits": "Acceso a contenido sobre cursos de Universidad"}
+            {"id": 1, "name": "ESO", "price": 4.99, "benefits": "Acceso a contenido sobre cursos de ESO"},
+            {"id": 2, "name": "Bachillerato", "price": 9.99, "benefits": "Acceso a contenido sobre cursos de Bachillerato"},
+            {"id": 3, "name": "Universidad", "price": 14.99, "benefits": "Acceso a contenido sobre cursos de Universidad"}
         ],
 }
 
