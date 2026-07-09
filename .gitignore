@@ -4,6 +4,10 @@ __pycache__/
 *.py[cod]
 .env
 
+# Base de datos local
+*.db
+instance/
+
 # Node
 node_modules/
 dist/
