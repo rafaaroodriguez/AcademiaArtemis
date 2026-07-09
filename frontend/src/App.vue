@@ -20,8 +20,8 @@ onMounted(() => {
     <div class="tiers-grid">
       <div v-for="tier in academy.tiers" :key="tier.id" class="card">
         <h2>{{ tier.name }}</h2>
-        <p class="price">${{ tier.price }}</p>
-        <p>{{ tier.benefit }}</p>
+        <p class="price">{{ tier.price }}€</p>
+        <p>{{ tier.benefits }}</p>
         <button>Seleccionar</button>
       </div>
     </div>
@@ -35,12 +35,13 @@ onMounted(() => {
   font-family: sans-serif; 
   padding: 20px; 
 }
-.tiers-grid 
-{ 
-  display: flex; 
-  justify-content: center; 
-  gap: 20px; 
-  margin-top: 40px; 
+.tiers-grid
+{
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 20px;
+  margin-top: 40px;
 }
 .card 
 { 
