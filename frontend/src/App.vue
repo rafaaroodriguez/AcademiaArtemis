@@ -1,14 +1,22 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { RouterLink, RouterView } from 'vue-router'
+import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAcademyStore } from './stores/useAcademy'
+import { useAuthStore } from './stores/useAuth'
 
 const academy = useAcademyStore()
+const auth = useAuthStore()
+const router = useRouter()
 
 // Cuando la página cargue, le pedimos los datos a Python
 onMounted(() => {
   academy.fetchInfo()
 })
+
+function cerrarSesion() {
+  auth.logout()
+  router.push('/')
+}
 </script>
 
 <template>
@@ -18,6 +26,14 @@ onMounted(() => {
       <RouterLink to="/">Inicio</RouterLink>
       <RouterLink to="/cursos">Cursos</RouterLink>
       <RouterLink to="/contacto">Contacto</RouterLink>
+      <template v-if="auth.estaLogueado">
+        <span class="saludo">Hola, {{ auth.usuario!.nombre }}</span>
+        <button class="salir" @click="cerrarSesion">Cerrar sesión</button>
+      </template>
+      <template v-else>
+        <RouterLink to="/login">Iniciar sesión</RouterLink>
+        <RouterLink to="/registro" class="destacado">Registrarse</RouterLink>
+      </template>
     </nav>
   </header>
 
@@ -69,6 +85,33 @@ nav a {
 nav a.router-link-active {
   color: #f1502f;
   font-weight: bold;
+}
+nav {
+  align-items: center;
+  flex-wrap: wrap;
+}
+.destacado {
+  background: #f1502f;
+  color: white !important;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-weight: bold;
+}
+.saludo {
+  color: #555;
+}
+.salir {
+  background: none;
+  border: 1px solid #ccc;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  color: #555;
+  font-size: 0.9rem;
+}
+.salir:hover {
+  border-color: #f1502f;
+  color: #f1502f;
 }
 main {
   min-height: calc(100vh - 130px);

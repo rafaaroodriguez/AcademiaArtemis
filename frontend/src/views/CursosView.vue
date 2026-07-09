@@ -16,7 +16,7 @@ const academy = useAcademyStore()
         <h2>{{ tier.name }}</h2>
         <p class="price">{{ tier.price }}€<span class="per">/mes</span></p>
         <p class="benefits">{{ tier.benefits }}</p>
-        <RouterLink to="/contacto" class="btn">Apuntarme</RouterLink>
+        <RouterLink to="/registro" class="btn">Apuntarme</RouterLink>
       </div>
     </div>
   </section>
