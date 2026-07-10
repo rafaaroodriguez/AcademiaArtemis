@@ -6,6 +6,7 @@ export interface Usuario {
   id: number
   nombre: string
   email: string
+  nivel_id: number | null
 }
 
 function mensajeDeError(error: unknown): string {
@@ -40,6 +41,16 @@ export const useAuthStore = defineStore('auth', {
       try {
         const { data } = await api.post('/api/login', { email, password })
         this.guardarSesion(data.token, data.usuario)
+      } catch (error) {
+        throw new Error(mensajeDeError(error))
+      }
+    },
+    // TODO (paso 4): esto pasará por el pago de Stripe antes de activar el plan
+    async elegirPlan(nivelId: number) {
+      try {
+        const { data } = await api.post('/api/suscripcion', { nivel_id: nivelId })
+        this.usuario = data.usuario
+        localStorage.setItem('usuario', JSON.stringify(data.usuario))
       } catch (error) {
         throw new Error(mensajeDeError(error))
       }

@@ -1,9 +1,28 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import { useAcademyStore } from '../stores/useAcademy'
 import { useAuthStore } from '../stores/useAuth'
 
 const academy = useAcademyStore()
 const auth = useAuthStore()
+const router = useRouter()
+
+const error = ref('')
+const eligiendo = ref(0)
+
+async function elegirPlan(nivelId: number) {
+  error.value = ''
+  eligiendo.value = nivelId
+  try {
+    await auth.elegirPlan(nivelId)
+    router.push(`/nivel/${nivelId}`)
+  } catch (e) {
+    error.value = (e as Error).message
+  } finally {
+    eligiendo.value = 0
+  }
+}
 </script>
 
 <template>
@@ -12,16 +31,30 @@ const auth = useAuthStore()
     <p class="intro">Elige el nivel que se ajusta a tu etapa. Todos los planes son mensuales y sin permanencia.</p>
 
     <p v-if="!academy.tiers.length" class="loading">Cargando niveles...</p>
+    <p v-if="error" class="error">{{ error }}</p>
 
     <div class="tiers-grid">
       <div v-for="tier in academy.tiers" :key="tier.id" class="card">
         <h2>{{ tier.name }}</h2>
         <p class="price">{{ tier.price }}€<span class="per">/mes</span></p>
         <p class="benefits">{{ tier.benefits }}</p>
-        <RouterLink v-if="auth.estaLogueado" :to="`/nivel/${tier.id}`" class="btn">
+
+        <!-- Sin sesión: a registrarse -->
+        <RouterLink v-if="!auth.estaLogueado" to="/registro" class="btn">Apuntarme</RouterLink>
+
+        <!-- Con sesión y este plan contratado: al contenido -->
+        <RouterLink
+          v-else-if="auth.usuario!.nivel_id === tier.id"
+          :to="`/nivel/${tier.id}`"
+          class="btn"
+        >
           Entrar al contenido
         </RouterLink>
-        <RouterLink v-else to="/registro" class="btn">Apuntarme</RouterLink>
+
+        <!-- Con sesión y otro plan (o ninguno): contratar este -->
+        <button v-else class="btn" :disabled="eligiendo !== 0" @click="elegirPlan(tier.id)">
+          {{ eligiendo === tier.id ? 'Activando...' : auth.usuario!.nivel_id ? 'Cambiar a este plan' : 'Elegir este plan' }}
+        </button>
       </div>
     </div>
   </section>
@@ -44,6 +77,10 @@ const auth = useAuthStore()
 .loading {
   margin-top: 40px;
   color: #888;
+}
+.error {
+  margin-top: 20px;
+  color: #c0392b;
 }
 .tiers-grid {
   display: flex;
@@ -83,5 +120,12 @@ const auth = useAuthStore()
   border-radius: 8px;
   text-decoration: none;
   font-weight: bold;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.btn:disabled {
+  opacity: 0.6;
+  cursor: default;
 }
 </style>

@@ -49,7 +49,10 @@ watch(() => route.params.id as string, cargar, { immediate: true })
 <template>
   <section class="nivel">
     <p v-if="cargando" class="aviso">Cargando contenido...</p>
-    <p v-else-if="error" class="aviso error">{{ error }}</p>
+    <div v-else-if="error" class="aviso">
+      <p class="error">{{ error }}</p>
+      <RouterLink to="/cursos" class="volver">Ver los planes disponibles</RouterLink>
+    </div>
 
     <template v-else>
       <h1>{{ nombreNivel }}</h1>
@@ -95,6 +98,12 @@ watch(() => route.params.id as string, cargar, { immediate: true })
 }
 .error {
   color: #c0392b;
+}
+.volver {
+  display: inline-block;
+  margin-top: 12px;
+  color: #f1502f;
+  font-weight: bold;
 }
 .asignatura {
   margin-bottom: 32px;

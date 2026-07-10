@@ -1,10 +1,16 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/useAuth'
+import { useAcademyStore } from '../stores/useAcademy'
 
 const auth = useAuthStore()
+const academy = useAcademyStore()
 const router = useRouter()
+
+const plan = computed(() =>
+  academy.tiers.find((t) => t.id === auth.usuario?.nivel_id) ?? null,
+)
 
 const error = ref('')
 const cargando = ref(true)
@@ -50,8 +56,22 @@ function cerrarSesion() {
 
       <div class="panel">
         <h2>Mi suscripción</h2>
-        <p class="sin-plan">Todavía no tienes ninguna suscripción activa.</p>
-        <RouterLink to="/cursos" class="btn">Ver planes</RouterLink>
+        <template v-if="plan">
+          <dl>
+            <dt>Plan</dt>
+            <dd>{{ plan.name }}</dd>
+            <dt>Precio</dt>
+            <dd>{{ plan.price }}€/mes</dd>
+          </dl>
+          <div class="acciones">
+            <RouterLink :to="`/nivel/${plan.id}`" class="btn">Ir a mi contenido</RouterLink>
+            <RouterLink to="/cursos" class="cambiar">Cambiar de plan</RouterLink>
+          </div>
+        </template>
+        <template v-else>
+          <p class="sin-plan">Todavía no tienes ninguna suscripción activa.</p>
+          <RouterLink to="/cursos" class="btn">Ver planes</RouterLink>
+        </template>
       </div>
 
       <button class="salir" @click="cerrarSesion">Cerrar sesión</button>
@@ -100,6 +120,17 @@ dt {
 .sin-plan {
   color: #555;
   margin-bottom: 16px;
+}
+.acciones {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+.cambiar {
+  color: #f1502f;
+  font-weight: bold;
 }
 .btn {
   display: inline-block;

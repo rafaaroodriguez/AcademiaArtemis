@@ -24,9 +24,16 @@ class Usuario(db.Model):
     nombre = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
+    # Nivel contratado (1=ESO, 2=Bachillerato, 3=Universidad); None = sin suscripción
+    nivel_id = db.Column(db.Integer, nullable=True)
 
     def a_dict(self):
-        return {"id": self.id, "nombre": self.nombre, "email": self.email}
+        return {
+            "id": self.id,
+            "nombre": self.nombre,
+            "email": self.email,
+            "nivel_id": self.nivel_id,
+        }
 
 
 class Asignatura(db.Model):
@@ -95,6 +102,12 @@ def cargar_contenido_de_ejemplo():
 
 with app.app_context():
     db.create_all()
+    # Mini-migración: añade usuario.nivel_id a bases creadas antes de este cambio
+    columnas = [c["name"] for c in db.inspect(db.engine).get_columns("usuario")]
+    if "nivel_id" not in columnas:
+        with db.engine.connect() as conexion:
+            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN nivel_id INTEGER"))
+            conexion.commit()
     if Asignatura.query.count() == 0:
         cargar_contenido_de_ejemplo()
 
@@ -152,13 +165,32 @@ def login():
     return jsonify({"token": token, "usuario": usuario.a_dict()})
 
 
+@app.route('/api/suscripcion', methods=['POST'])
+@jwt_required()
+def elegir_suscripcion():
+    # TODO (paso 4): aquí irá el cobro con Stripe antes de activar el plan
+    datos = request.get_json(silent=True) or {}
+    nivel_id = datos.get('nivel_id')
+    if not any(n["id"] == nivel_id for n in datos_academia["niveles"]):
+        return jsonify({"error": "Ese nivel no existe"}), 404
+
+    usuario = db.session.get(Usuario, int(get_jwt_identity()))
+    usuario.nivel_id = nivel_id
+    db.session.commit()
+    return jsonify({"usuario": usuario.a_dict()})
+
+
 @app.route('/api/niveles/<int:nivel_id>/contenido', methods=['GET'])
 @jwt_required()
 def contenido_nivel(nivel_id):
     nivel = next((n for n in datos_academia["niveles"] if n["id"] == nivel_id), None)
     if not nivel:
         return jsonify({"error": "Ese nivel no existe"}), 404
-    # TODO (paso 3): comprobar que el alumno tiene suscripción a este nivel
+
+    usuario = db.session.get(Usuario, int(get_jwt_identity()))
+    if usuario.nivel_id != nivel_id:
+        return jsonify({"error": "Necesitas una suscripción a este nivel para ver su contenido"}), 403
+
     asignaturas = Asignatura.query.filter_by(nivel_id=nivel_id).order_by(Asignatura.nombre).all()
     return jsonify({
         "nivel": nivel,
