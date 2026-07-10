@@ -26,6 +26,12 @@ const router = createRouter({
       component: () => import('../views/MiCuentaView.vue'),
       meta: { requiereSesion: true },
     },
+    {
+      path: '/nivel/:id',
+      name: 'nivel',
+      component: () => import('../views/NivelView.vue'),
+      meta: { requiereSesion: true },
+    },
   ],
 })
 

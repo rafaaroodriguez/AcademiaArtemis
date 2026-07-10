@@ -29,8 +29,74 @@ class Usuario(db.Model):
         return {"id": self.id, "nombre": self.nombre, "email": self.email}
 
 
+class Asignatura(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    # 1 = ESO, 2 = Bachillerato, 3 = Universidad (ids de datos_academia["niveles"])
+    nivel_id = db.Column(db.Integer, nullable=False)
+    nombre = db.Column(db.String(120), nullable=False)
+    temas = db.relationship('Tema', backref='asignatura', order_by='Tema.orden')
+
+    def a_dict(self):
+        return {
+            "id": self.id,
+            "nombre": self.nombre,
+            "temas": [tema.a_dict() for tema in self.temas],
+        }
+
+
+class Tema(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    asignatura_id = db.Column(db.Integer, db.ForeignKey('asignatura.id'), nullable=False)
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    titulo = db.Column(db.String(200), nullable=False)
+    descripcion = db.Column(db.Text, default='')
+    # Enlace al material (PDF, vídeo...); de momento puede quedar vacío
+    material_url = db.Column(db.String(500), default='')
+
+    def a_dict(self):
+        return {
+            "id": self.id,
+            "titulo": self.titulo,
+            "descripcion": self.descripcion,
+            "material_url": self.material_url,
+        }
+
+
+def cargar_contenido_de_ejemplo():
+    """Contenido provisional para desarrollo. TODO: sustituir por el temario real."""
+    ejemplo = {
+        1: {  # ESO
+            "Matemáticas": ["Números enteros y fracciones", "Ecuaciones de primer grado", "Geometría básica"],
+            "Lengua": ["Morfología: las clases de palabras", "Sintaxis de la oración simple"],
+        },
+        2: {  # Bachillerato
+            "Matemáticas": ["Límites y continuidad", "Derivadas", "Integrales"],
+            "Física y Química": ["Cinemática", "Formulación inorgánica"],
+        },
+        3: {  # Universidad
+            "Cálculo": ["Cálculo diferencial en varias variables", "Series numéricas"],
+            "Álgebra lineal": ["Espacios vectoriales", "Diagonalización"],
+        },
+    }
+    for nivel_id, asignaturas in ejemplo.items():
+        for nombre, temas in asignaturas.items():
+            asignatura = Asignatura(nivel_id=nivel_id, nombre=nombre)
+            db.session.add(asignatura)
+            db.session.flush()
+            for orden, titulo in enumerate(temas, start=1):
+                db.session.add(Tema(
+                    asignatura_id=asignatura.id,
+                    orden=orden,
+                    titulo=titulo,
+                    descripcion=f"Apuntes y ejercicios de: {titulo}.",
+                ))
+    db.session.commit()
+
+
 with app.app_context():
     db.create_all()
+    if Asignatura.query.count() == 0:
+        cargar_contenido_de_ejemplo()
 
 
 datos_academia = {
@@ -84,6 +150,20 @@ def login():
 
     token = create_access_token(identity=str(usuario.id))
     return jsonify({"token": token, "usuario": usuario.a_dict()})
+
+
+@app.route('/api/niveles/<int:nivel_id>/contenido', methods=['GET'])
+@jwt_required()
+def contenido_nivel(nivel_id):
+    nivel = next((n for n in datos_academia["niveles"] if n["id"] == nivel_id), None)
+    if not nivel:
+        return jsonify({"error": "Ese nivel no existe"}), 404
+    # TODO (paso 3): comprobar que el alumno tiene suscripción a este nivel
+    asignaturas = Asignatura.query.filter_by(nivel_id=nivel_id).order_by(Asignatura.nombre).all()
+    return jsonify({
+        "nivel": nivel,
+        "asignaturas": [a.a_dict() for a in asignaturas],
+    })
 
 
 @app.route('/api/perfil', methods=['GET'])

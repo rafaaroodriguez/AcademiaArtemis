@@ -1,7 +1,9 @@
 <script setup lang="ts">
 import { useAcademyStore } from '../stores/useAcademy'
+import { useAuthStore } from '../stores/useAuth'
 
 const academy = useAcademyStore()
+const auth = useAuthStore()
 </script>
 
 <template>
@@ -16,7 +18,10 @@ const academy = useAcademyStore()
         <h2>{{ tier.name }}</h2>
         <p class="price">{{ tier.price }}€<span class="per">/mes</span></p>
         <p class="benefits">{{ tier.benefits }}</p>
-        <RouterLink to="/registro" class="btn">Apuntarme</RouterLink>
+        <RouterLink v-if="auth.estaLogueado" :to="`/nivel/${tier.id}`" class="btn">
+          Entrar al contenido
+        </RouterLink>
+        <RouterLink v-else to="/registro" class="btn">Apuntarme</RouterLink>
       </div>
     </div>
   </section>
