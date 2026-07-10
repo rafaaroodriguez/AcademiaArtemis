@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/useAuth'
 
 const auth = useAuthStore()
 const router = useRouter()
+const route = useRoute()
 
 const email = ref('')
 const password = ref('')
@@ -16,7 +17,8 @@ async function enviar() {
   enviando.value = true
   try {
     await auth.login(email.value, password.value)
-    router.push('/')
+    // Si venía de una página privada, le devolvemos a ella
+    router.push((route.query.redirect as string) || '/')
   } catch (e) {
     error.value = (e as Error).message
   } finally {
