@@ -7,6 +7,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 
 # Carga Backend/.env si existe (ADMIN_EMAIL, JWT_SECRET_KEY, etc.)
@@ -21,6 +22,9 @@ app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
 
 # El usuario con este email es administrador del panel
 ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '').strip().lower()
+
+# URL del frontend, usada en los enlaces de los emails
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
 
 CORS(app)
 db = SQLAlchemy(app)
@@ -231,6 +235,68 @@ def contenido_nivel(nivel_id):
         "nivel": nivel,
         "asignaturas": [a.a_dict() for a in asignaturas],
     })
+
+
+def serializador_recuperacion():
+    return URLSafeTimedSerializer(app.config['JWT_SECRET_KEY'], salt='recuperar-password')
+
+
+def enviar_email_recuperacion(destinatario, enlace):
+    host = os.environ.get('SMTP_HOST')
+    if not host:
+        # Sin servidor de correo configurado (desarrollo): el enlace sale por consola
+        print(f"[DEV] Enlace de recuperación para {destinatario}: {enlace}")
+        return
+    import smtplib
+    from email.message import EmailMessage
+
+    mensaje = EmailMessage()
+    mensaje['Subject'] = 'Recupera tu contraseña · Academia Artemis'
+    mensaje['From'] = os.environ.get('MAIL_FROM', 'no-reply@academiaartemis.com')
+    mensaje['To'] = destinatario
+    mensaje.set_content(
+        "Hola,\n\n"
+        "Para restablecer tu contraseña de Academia Artemis entra en:\n"
+        f"{enlace}\n\n"
+        "El enlace caduca en 1 hora. Si no has pedido este cambio, ignora este mensaje."
+    )
+    with smtplib.SMTP(host, int(os.environ.get('SMTP_PORT', '587'))) as servidor:
+        servidor.starttls()
+        servidor.login(os.environ.get('SMTP_USER', ''), os.environ.get('SMTP_PASS', ''))
+        servidor.send_message(mensaje)
+
+
+@app.route('/api/recuperar', methods=['POST'])
+def recuperar():
+    email = ((request.get_json(silent=True) or {}).get('email') or '').strip().lower()
+    usuario = Usuario.query.filter_by(email=email).first()
+    if usuario:
+        token = serializador_recuperacion().dumps(usuario.id)
+        enviar_email_recuperacion(email, f"{FRONTEND_URL}/restablecer?token={token}")
+    # La respuesta es la misma exista o no la cuenta, para no revelar qué emails están registrados
+    return jsonify({"mensaje": "Si existe una cuenta con ese email, te hemos enviado un enlace para restablecer la contraseña."})
+
+
+@app.route('/api/restablecer', methods=['POST'])
+def restablecer():
+    datos = request.get_json(silent=True) or {}
+    token = datos.get('token') or ''
+    password = datos.get('password') or ''
+    if len(password) < 6:
+        return jsonify({"error": "La contraseña debe tener al menos 6 caracteres"}), 400
+    try:
+        usuario_id = serializador_recuperacion().loads(token, max_age=3600)
+    except SignatureExpired:
+        return jsonify({"error": "El enlace ha caducado. Pide uno nuevo desde 'He olvidado mi contraseña'"}), 400
+    except BadSignature:
+        return jsonify({"error": "El enlace no es válido"}), 400
+
+    usuario = db.session.get(Usuario, usuario_id)
+    if not usuario:
+        return jsonify({"error": "El enlace no es válido"}), 400
+    usuario.password_hash = generate_password_hash(password)
+    db.session.commit()
+    return jsonify({"mensaje": "Contraseña actualizada. Ya puedes iniciar sesión."})
 
 
 @app.route('/api/perfil', methods=['GET'])

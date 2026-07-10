@@ -38,6 +38,21 @@ const router = createRouter({
       component: () => import('../views/AdminView.vue'),
       meta: { requiereSesion: true, requiereAdmin: true },
     },
+    {
+      path: '/recuperar',
+      name: 'recuperar',
+      component: () => import('../views/RecuperarView.vue'),
+      meta: { soloInvitados: true },
+    },
+    {
+      path: '/restablecer',
+      name: 'restablecer',
+      component: () => import('../views/RestablecerView.vue'),
+      meta: { soloInvitados: true },
+    },
+    { path: '/aviso-legal', name: 'aviso-legal', component: () => import('../views/AvisoLegalView.vue') },
+    { path: '/privacidad', name: 'privacidad', component: () => import('../views/PrivacidadView.vue') },
+    { path: '/cookies', name: 'cookies', component: () => import('../views/CookiesView.vue') },
   ],
 })
 
