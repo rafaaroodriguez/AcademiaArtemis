@@ -95,6 +95,17 @@ async function crearTema(asignaturaId: number) {
   }
 }
 
+async function borrarAlumno(alumno: Usuario) {
+  if (!confirm(`¿Borrar la cuenta de ${alumno.nombre} (${alumno.email})?`)) return
+  error.value = ''
+  try {
+    await api.delete(`/api/admin/alumnos/${alumno.id}`)
+    await cargarAlumnos()
+  } catch (e) {
+    error.value = mensaje(e)
+  }
+}
+
 async function borrarTema(id: number) {
   if (!confirm('¿Borrar este tema?')) return
   error.value = ''
@@ -132,6 +143,7 @@ onMounted(async () => {
             <th>Nombre</th>
             <th>Email</th>
             <th>Plan</th>
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -139,6 +151,11 @@ onMounted(async () => {
             <td>{{ alumno.nombre }} <span v-if="alumno.es_admin" class="etiqueta">admin</span></td>
             <td>{{ alumno.email }}</td>
             <td>{{ nombreNivel(alumno.nivel_id) }}</td>
+            <td class="acciones-fila">
+              <button v-if="!alumno.es_admin" class="borrar" @click="borrarAlumno(alumno)">
+                Borrar
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -221,6 +238,9 @@ td {
   text-align: left;
   padding: 8px;
   border-bottom: 1px solid #eee;
+}
+.acciones-fila {
+  text-align: right;
 }
 .etiqueta {
   background: #f1502f;

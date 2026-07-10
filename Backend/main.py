@@ -251,6 +251,19 @@ def admin_alumnos():
     return jsonify({"alumnos": [u.a_dict() for u in alumnos]})
 
 
+@app.route('/api/admin/alumnos/<int:alumno_id>', methods=['DELETE'])
+@requiere_admin
+def admin_borrar_alumno(alumno_id):
+    alumno = db.session.get(Usuario, alumno_id)
+    if not alumno:
+        return jsonify({"error": "Ese alumno no existe"}), 404
+    if alumno.es_admin:
+        return jsonify({"error": "No se puede borrar una cuenta de administrador"}), 400
+    db.session.delete(alumno)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
 @app.route('/api/admin/asignaturas', methods=['POST'])
 @requiere_admin
 def admin_crear_asignatura():
