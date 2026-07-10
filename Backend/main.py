@@ -1,11 +1,16 @@
 import os
 from datetime import timedelta
+from functools import wraps
 
+from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from werkzeug.security import generate_password_hash, check_password_hash
+
+# Carga Backend/.env si existe (ADMIN_EMAIL, JWT_SECRET_KEY, etc.)
+load_dotenv()
 
 app = Flask(__name__)
 
@@ -13,6 +18,9 @@ app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:/
 # En producción (Render) hay que definir JWT_SECRET_KEY como variable de entorno
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-solo-para-local')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)
+
+# El usuario con este email es administrador del panel
+ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '').strip().lower()
 
 CORS(app)
 db = SQLAlchemy(app)
@@ -26,6 +34,7 @@ class Usuario(db.Model):
     password_hash = db.Column(db.String(256), nullable=False)
     # Nivel contratado (1=ESO, 2=Bachillerato, 3=Universidad); None = sin suscripción
     nivel_id = db.Column(db.Integer, nullable=True)
+    es_admin = db.Column(db.Boolean, nullable=False, default=False)
 
     def a_dict(self):
         return {
@@ -33,6 +42,7 @@ class Usuario(db.Model):
             "nombre": self.nombre,
             "email": self.email,
             "nivel_id": self.nivel_id,
+            "es_admin": self.es_admin,
         }
 
 
@@ -102,14 +112,34 @@ def cargar_contenido_de_ejemplo():
 
 with app.app_context():
     db.create_all()
-    # Mini-migración: añade usuario.nivel_id a bases creadas antes de este cambio
+    # Mini-migraciones: añaden columnas nuevas a bases ya existentes
     columnas = [c["name"] for c in db.inspect(db.engine).get_columns("usuario")]
-    if "nivel_id" not in columnas:
-        with db.engine.connect() as conexion:
+    with db.engine.connect() as conexion:
+        if "nivel_id" not in columnas:
             conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN nivel_id INTEGER"))
-            conexion.commit()
+        if "es_admin" not in columnas:
+            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN es_admin BOOLEAN NOT NULL DEFAULT 0"))
+        conexion.commit()
     if Asignatura.query.count() == 0:
         cargar_contenido_de_ejemplo()
+    # Si el email de ADMIN_EMAIL ya tiene cuenta, se le hace administrador
+    if ADMIN_EMAIL:
+        admin = Usuario.query.filter_by(email=ADMIN_EMAIL).first()
+        if admin and not admin.es_admin:
+            admin.es_admin = True
+            db.session.commit()
+
+
+def requiere_admin(funcion):
+    """Como jwt_required, pero además el usuario debe ser administrador."""
+    @wraps(funcion)
+    @jwt_required()
+    def envoltura(*args, **kwargs):
+        usuario = db.session.get(Usuario, int(get_jwt_identity()))
+        if not usuario or not usuario.es_admin:
+            return jsonify({"error": "Esta zona es solo para administradores"}), 403
+        return funcion(*args, **kwargs)
+    return envoltura
 
 
 datos_academia = {
@@ -143,7 +173,12 @@ def registro():
     if Usuario.query.filter_by(email=email).first():
         return jsonify({"error": "Ya existe una cuenta con ese email"}), 409
 
-    usuario = Usuario(nombre=nombre, email=email, password_hash=generate_password_hash(password))
+    usuario = Usuario(
+        nombre=nombre,
+        email=email,
+        password_hash=generate_password_hash(password),
+        es_admin=(email == ADMIN_EMAIL),
+    )
     db.session.add(usuario)
     db.session.commit()
 
@@ -188,7 +223,7 @@ def contenido_nivel(nivel_id):
         return jsonify({"error": "Ese nivel no existe"}), 404
 
     usuario = db.session.get(Usuario, int(get_jwt_identity()))
-    if usuario.nivel_id != nivel_id:
+    if not usuario.es_admin and usuario.nivel_id != nivel_id:
         return jsonify({"error": "Necesitas una suscripción a este nivel para ver su contenido"}), 403
 
     asignaturas = Asignatura.query.filter_by(nivel_id=nivel_id).order_by(Asignatura.nombre).all()
@@ -205,6 +240,76 @@ def perfil():
     if not usuario:
         return jsonify({"error": "Usuario no encontrado"}), 404
     return jsonify({"usuario": usuario.a_dict()})
+
+
+# ------------------------- Zona de administración -------------------------
+
+@app.route('/api/admin/alumnos', methods=['GET'])
+@requiere_admin
+def admin_alumnos():
+    alumnos = Usuario.query.order_by(Usuario.id).all()
+    return jsonify({"alumnos": [u.a_dict() for u in alumnos]})
+
+
+@app.route('/api/admin/asignaturas', methods=['POST'])
+@requiere_admin
+def admin_crear_asignatura():
+    datos = request.get_json(silent=True) or {}
+    nombre = (datos.get('nombre') or '').strip()
+    nivel_id = datos.get('nivel_id')
+    if not nombre or not any(n["id"] == nivel_id for n in datos_academia["niveles"]):
+        return jsonify({"error": "Hacen falta un nombre y un nivel válido"}), 400
+    asignatura = Asignatura(nivel_id=nivel_id, nombre=nombre)
+    db.session.add(asignatura)
+    db.session.commit()
+    return jsonify({"asignatura": asignatura.a_dict()}), 201
+
+
+@app.route('/api/admin/asignaturas/<int:asignatura_id>', methods=['DELETE'])
+@requiere_admin
+def admin_borrar_asignatura(asignatura_id):
+    asignatura = db.session.get(Asignatura, asignatura_id)
+    if not asignatura:
+        return jsonify({"error": "Esa asignatura no existe"}), 404
+    for tema in asignatura.temas:
+        db.session.delete(tema)
+    db.session.delete(asignatura)
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@app.route('/api/admin/asignaturas/<int:asignatura_id>/temas', methods=['POST'])
+@requiere_admin
+def admin_crear_tema(asignatura_id):
+    asignatura = db.session.get(Asignatura, asignatura_id)
+    if not asignatura:
+        return jsonify({"error": "Esa asignatura no existe"}), 404
+    datos = request.get_json(silent=True) or {}
+    titulo = (datos.get('titulo') or '').strip()
+    if not titulo:
+        return jsonify({"error": "El título es obligatorio"}), 400
+    ultimo_orden = max((t.orden for t in asignatura.temas), default=0)
+    tema = Tema(
+        asignatura_id=asignatura_id,
+        orden=ultimo_orden + 1,
+        titulo=titulo,
+        descripcion=(datos.get('descripcion') or '').strip(),
+        material_url=(datos.get('material_url') or '').strip(),
+    )
+    db.session.add(tema)
+    db.session.commit()
+    return jsonify({"tema": tema.a_dict()}), 201
+
+
+@app.route('/api/admin/temas/<int:tema_id>', methods=['DELETE'])
+@requiere_admin
+def admin_borrar_tema(tema_id):
+    tema = db.session.get(Tema, tema_id)
+    if not tema:
+        return jsonify({"error": "Ese tema no existe"}), 404
+    db.session.delete(tema)
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 if __name__ == '__main__':

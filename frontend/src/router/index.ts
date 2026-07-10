@@ -32,6 +32,12 @@ const router = createRouter({
       component: () => import('../views/NivelView.vue'),
       meta: { requiereSesion: true },
     },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: () => import('../views/AdminView.vue'),
+      meta: { requiereSesion: true, requiereAdmin: true },
+    },
   ],
 })
 
@@ -44,6 +50,10 @@ router.beforeEach((to) => {
   // Con la sesión iniciada, login y registro no pintan nada
   if (to.meta.soloInvitados && auth.estaLogueado) {
     return { path: '/cuenta' }
+  }
+  // La zona de administración solo la ven los administradores
+  if (to.meta.requiereAdmin && !auth.esAdmin) {
+    return { path: '/' }
   }
 })
 

@@ -27,6 +27,7 @@ function cerrarSesion() {
       <RouterLink to="/cursos">Cursos</RouterLink>
       <RouterLink to="/contacto">Contacto</RouterLink>
       <template v-if="auth.estaLogueado">
+        <RouterLink v-if="auth.esAdmin" to="/admin">Admin</RouterLink>
         <RouterLink to="/cuenta" class="saludo">Hola, {{ auth.usuario!.nombre }}</RouterLink>
         <button class="salir" @click="cerrarSesion">Cerrar sesión</button>
       </template>

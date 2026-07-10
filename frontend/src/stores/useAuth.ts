@@ -7,6 +7,7 @@ export interface Usuario {
   nombre: string
   email: string
   nivel_id: number | null
+  es_admin: boolean
 }
 
 function mensajeDeError(error: unknown): string {
@@ -22,6 +23,7 @@ export const useAuthStore = defineStore('auth', {
   }),
   getters: {
     estaLogueado: (state) => state.usuario !== null,
+    esAdmin: (state) => state.usuario?.es_admin === true,
   },
   actions: {
     guardarSesion(token: string, usuario: Usuario) {
