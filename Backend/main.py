@@ -144,6 +144,11 @@ with app.app_context():
             db.session.commit()
 
 
+def usuario_del_token():
+    """Usuario de la sesión actual, o None si la cuenta ya no existe."""
+    return db.session.get(Usuario, int(get_jwt_identity()))
+
+
 def requiere_admin(funcion):
     """Como jwt_required, pero además el usuario debe ser administrador."""
     @wraps(funcion)
@@ -223,7 +228,9 @@ def crear_checkout():
     if not nivel:
         return jsonify({"error": "Ese nivel no existe"}), 404
 
-    usuario = db.session.get(Usuario, int(get_jwt_identity()))
+    usuario = usuario_del_token()
+    if not usuario:
+        return jsonify({"error": "Tu cuenta ya no existe. Regístrate de nuevo"}), 401
 
     if not STRIPE_SECRET_KEY:
         # Sin Stripe configurado (desarrollo): activación directa sin pago
@@ -265,19 +272,24 @@ def confirmar_checkout():
     session_id = (request.get_json(silent=True) or {}).get('session_id') or ''
     try:
         sesion = stripe.checkout.Session.retrieve(session_id)
-    except stripe.StripeError:
-        return jsonify({"error": "No se pudo verificar el pago"}), 400
 
-    usuario = db.session.get(Usuario, int(get_jwt_identity()))
-    metadatos = sesion.metadata or {}
-    if metadatos.get('usuario_id') != str(usuario.id):
-        return jsonify({"error": "Este pago no corresponde a tu cuenta"}), 403
-    if sesion.payment_status != 'paid':
-        return jsonify({"error": "El pago no se ha completado"}), 400
+        usuario = usuario_del_token()
+        if not usuario:
+            return jsonify({"error": "Tu cuenta ya no existe. Regístrate de nuevo"}), 401
+        metadatos = sesion.metadata or {}
+        if metadatos.get('usuario_id') != str(usuario.id):
+            return jsonify({"error": "Este pago no corresponde a tu cuenta"}), 403
+        if sesion.payment_status != 'paid':
+            return jsonify({"error": "El pago no se ha completado"}), 400
 
-    usuario.nivel_id = int(metadatos['nivel_id'])
-    db.session.commit()
-    return jsonify({"usuario": usuario.a_dict()})
+        usuario.nivel_id = int(metadatos['nivel_id'])
+        db.session.commit()
+        return jsonify({"usuario": usuario.a_dict()})
+    except Exception as error:
+        # Cualquier fallo queda en el log y responde JSON limpio (con CORS),
+        # en vez del 500 en HTML del depurador de Flask
+        app.logger.exception(f"Error verificando el pago de la sesión {session_id}: {error}")
+        return jsonify({"error": "No se pudo verificar el pago. Revisa la consola del backend"}), 500
 
 
 @app.route('/api/niveles/<int:nivel_id>/contenido', methods=['GET'])
@@ -287,7 +299,9 @@ def contenido_nivel(nivel_id):
     if not nivel:
         return jsonify({"error": "Ese nivel no existe"}), 404
 
-    usuario = db.session.get(Usuario, int(get_jwt_identity()))
+    usuario = usuario_del_token()
+    if not usuario:
+        return jsonify({"error": "Tu cuenta ya no existe. Regístrate de nuevo"}), 401
     if not usuario.es_admin and usuario.nivel_id != nivel_id:
         return jsonify({"error": "Necesitas una suscripción a este nivel para ver su contenido"}), 403
 
