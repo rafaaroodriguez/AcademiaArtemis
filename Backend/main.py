@@ -276,13 +276,19 @@ def confirmar_checkout():
         usuario = usuario_del_token()
         if not usuario:
             return jsonify({"error": "Tu cuenta ya no existe. Regístrate de nuevo"}), 401
-        metadatos = sesion.metadata or {}
-        if metadatos.get('usuario_id') != str(usuario.id):
+        # sesion.metadata es un StripeObject, no un dict: solo el acceso con
+        # corchetes funciona en todas las versiones de la librería
+        try:
+            usuario_id_pago = str(sesion.metadata['usuario_id'])
+            nivel_id_pago = int(sesion.metadata['nivel_id'])
+        except (KeyError, TypeError):
+            return jsonify({"error": "El pago no lleva los datos esperados"}), 400
+        if usuario_id_pago != str(usuario.id):
             return jsonify({"error": "Este pago no corresponde a tu cuenta"}), 403
         if sesion.payment_status != 'paid':
             return jsonify({"error": "El pago no se ha completado"}), 400
 
-        usuario.nivel_id = int(metadatos['nivel_id'])
+        usuario.nivel_id = nivel_id_pago
         db.session.commit()
         return jsonify({"usuario": usuario.a_dict()})
     except Exception as error:
