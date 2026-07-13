@@ -39,6 +39,12 @@ const router = createRouter({
       meta: { requiereSesion: true, requiereAdmin: true },
     },
     {
+      path: '/pago/exito',
+      name: 'pago-exito',
+      component: () => import('../views/PagoExitoView.vue'),
+      meta: { requiereSesion: true },
+    },
+    {
       path: '/recuperar',
       name: 'recuperar',
       component: () => import('../views/RecuperarView.vue'),

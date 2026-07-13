@@ -47,10 +47,27 @@ export const useAuthStore = defineStore('auth', {
         throw new Error(mensajeDeError(error))
       }
     },
-    // TODO (paso 4): esto pasará por el pago de Stripe antes de activar el plan
-    async elegirPlan(nivelId: number) {
+    // Inicia la contratación de un plan. Con Stripe configurado redirige a su
+    // página de pago y devuelve false; sin Stripe (desarrollo) activa el plan
+    // directamente y devuelve true.
+    async elegirPlan(nivelId: number): Promise<boolean> {
       try {
-        const { data } = await api.post('/api/suscripcion', { nivel_id: nivelId })
+        const { data } = await api.post('/api/suscripcion/checkout', { nivel_id: nivelId })
+        if (data.url) {
+          window.location.href = data.url
+          return false
+        }
+        this.usuario = data.usuario
+        localStorage.setItem('usuario', JSON.stringify(data.usuario))
+        return true
+      } catch (error) {
+        throw new Error(mensajeDeError(error))
+      }
+    },
+    // Al volver de Stripe: el backend verifica el pago y activa el plan
+    async confirmarPago(sessionId: string) {
+      try {
+        const { data } = await api.post('/api/suscripcion/confirmar', { session_id: sessionId })
         this.usuario = data.usuario
         localStorage.setItem('usuario', JSON.stringify(data.usuario))
       } catch (error) {

@@ -15,11 +15,14 @@ async function elegirPlan(nivelId: number) {
   error.value = ''
   eligiendo.value = nivelId
   try {
-    await auth.elegirPlan(nivelId)
-    router.push(`/nivel/${nivelId}`)
+    // Con Stripe configurado, elegirPlan redirige a la página de pago y no
+    // volvemos por aquí; sin Stripe la activación es directa
+    const activadoDirectamente = await auth.elegirPlan(nivelId)
+    if (activadoDirectamente) {
+      router.push(`/nivel/${nivelId}`)
+    }
   } catch (e) {
     error.value = (e as Error).message
-  } finally {
     eligiendo.value = 0
   }
 }

@@ -2,6 +2,7 @@ import os
 from datetime import timedelta
 from functools import wraps
 
+import stripe
 from dotenv import load_dotenv
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -25,6 +26,12 @@ ADMIN_EMAIL = os.environ.get('ADMIN_EMAIL', '').strip().lower()
 
 # URL del frontend, usada en los enlaces de los emails
 FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/')
+
+# Clave secreta de Stripe (sk_test_... en pruebas). Sin ella, la suscripción
+# se activa directamente sin pago (solo útil en desarrollo).
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+if STRIPE_SECRET_KEY:
+    stripe.api_key = STRIPE_SECRET_KEY
 
 CORS(app)
 db = SQLAlchemy(app)
@@ -204,17 +211,67 @@ def login():
     return jsonify({"token": token, "usuario": usuario.a_dict()})
 
 
-@app.route('/api/suscripcion', methods=['POST'])
+@app.route('/api/suscripcion/checkout', methods=['POST'])
 @jwt_required()
-def elegir_suscripcion():
-    # TODO (paso 4): aquí irá el cobro con Stripe antes de activar el plan
+def crear_checkout():
     datos = request.get_json(silent=True) or {}
     nivel_id = datos.get('nivel_id')
-    if not any(n["id"] == nivel_id for n in datos_academia["niveles"]):
+    nivel = next((n for n in datos_academia["niveles"] if n["id"] == nivel_id), None)
+    if not nivel:
         return jsonify({"error": "Ese nivel no existe"}), 404
 
     usuario = db.session.get(Usuario, int(get_jwt_identity()))
-    usuario.nivel_id = nivel_id
+
+    if not STRIPE_SECRET_KEY:
+        # Sin Stripe configurado (desarrollo): activación directa sin pago
+        usuario.nivel_id = nivel_id
+        db.session.commit()
+        return jsonify({"usuario": usuario.a_dict()})
+
+    try:
+        sesion = stripe.checkout.Session.create(
+            mode='subscription',
+            customer_email=usuario.email,
+            line_items=[{
+                'quantity': 1,
+                'price_data': {
+                    'currency': 'eur',
+                    'unit_amount': int(round(nivel['price'] * 100)),
+                    'recurring': {'interval': 'month'},
+                    'product_data': {'name': f"Plan {nivel['name']} · Academia Artemis"},
+                },
+            }],
+            metadata={'usuario_id': str(usuario.id), 'nivel_id': str(nivel_id)},
+            success_url=f"{FRONTEND_URL}/pago/exito?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{FRONTEND_URL}/cursos",
+        )
+    except stripe.StripeError as error:
+        app.logger.error(f"Error de Stripe al crear el checkout: {error}")
+        return jsonify({"error": "No se pudo iniciar el pago. Inténtalo de nuevo en unos minutos"}), 502
+    return jsonify({"url": sesion.url})
+
+
+@app.route('/api/suscripcion/confirmar', methods=['POST'])
+@jwt_required()
+def confirmar_checkout():
+    """Tras volver de Stripe, comprobamos CON STRIPE que el pago está hecho
+    antes de activar el plan. El navegador nunca decide si se activa."""
+    if not STRIPE_SECRET_KEY:
+        return jsonify({"error": "Stripe no está configurado"}), 503
+
+    session_id = (request.get_json(silent=True) or {}).get('session_id') or ''
+    try:
+        sesion = stripe.checkout.Session.retrieve(session_id)
+    except stripe.StripeError:
+        return jsonify({"error": "No se pudo verificar el pago"}), 400
+
+    usuario = db.session.get(Usuario, int(get_jwt_identity()))
+    if sesion.metadata.get('usuario_id') != str(usuario.id):
+        return jsonify({"error": "Este pago no corresponde a tu cuenta"}), 403
+    if sesion.payment_status != 'paid':
+        return jsonify({"error": "El pago no se ha completado"}), 400
+
+    usuario.nivel_id = int(sesion.metadata['nivel_id'])
     db.session.commit()
     return jsonify({"usuario": usuario.a_dict()})
 
