@@ -15,7 +15,8 @@ const plan = computed(() =>
   academy.tiers.find((t) => t.id === auth.usuario?.nivel_id) ?? null,
 )
 
-onMounted(async () => {
+async function verificar() {
+  estado.value = 'verificando'
   try {
     await auth.confirmarPago((route.query.session_id as string) || '')
     estado.value = 'ok'
@@ -23,7 +24,9 @@ onMounted(async () => {
     error.value = (e as Error).message
     estado.value = 'error'
   }
-})
+}
+
+onMounted(verificar)
 </script>
 
 <template>
@@ -46,10 +49,11 @@ onMounted(async () => {
       <h1>No hemos podido confirmar el pago</h1>
       <p class="detalle error">{{ error }}</p>
       <p class="detalle">
-        Si crees que el cobro se realizó, escríbenos desde
-        <RouterLink to="/contacto">Contacto</RouterLink> y lo revisamos.
+        Tranquilo: si el cobro se realizó, no se pierde. Reintenta la verificación y, si sigue
+        fallando, escríbenos desde <RouterLink to="/contacto">Contacto</RouterLink> y lo revisamos.
       </p>
-      <RouterLink to="/cursos" class="btn">Volver a los planes</RouterLink>
+      <button class="btn" @click="verificar">Reintentar verificación</button>
+      <RouterLink to="/cursos" class="secundario">Volver a los planes</RouterLink>
     </template>
   </section>
 </template>
@@ -82,6 +86,15 @@ onMounted(async () => {
   text-decoration: none;
   font-weight: bold;
   margin-top: 8px;
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+}
+.secundario {
+  display: block;
+  margin-top: 16px;
+  color: #f1502f;
+  font-weight: bold;
 }
 .detalle a {
   color: #f1502f;

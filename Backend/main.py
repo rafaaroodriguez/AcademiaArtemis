@@ -269,12 +269,13 @@ def confirmar_checkout():
         return jsonify({"error": "No se pudo verificar el pago"}), 400
 
     usuario = db.session.get(Usuario, int(get_jwt_identity()))
-    if sesion.metadata.get('usuario_id') != str(usuario.id):
+    metadatos = sesion.metadata or {}
+    if metadatos.get('usuario_id') != str(usuario.id):
         return jsonify({"error": "Este pago no corresponde a tu cuenta"}), 403
     if sesion.payment_status != 'paid':
         return jsonify({"error": "El pago no se ha completado"}), 400
 
-    usuario.nivel_id = int(sesion.metadata['nivel_id'])
+    usuario.nivel_id = int(metadatos['nivel_id'])
     db.session.commit()
     return jsonify({"usuario": usuario.a_dict()})
 

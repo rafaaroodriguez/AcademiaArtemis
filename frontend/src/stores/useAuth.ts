@@ -11,10 +11,15 @@ export interface Usuario {
 }
 
 function mensajeDeError(error: unknown): string {
-  if (isAxiosError(error) && error.response?.data?.error) {
-    return error.response.data.error
+  if (isAxiosError(error)) {
+    if (error.response?.data?.error) {
+      return error.response.data.error
+    }
+    if (error.response) {
+      return `El servidor devolvió un error inesperado (HTTP ${error.response.status}). Revisa la consola del backend.`
+    }
   }
-  return 'No se pudo conectar con el servidor. Inténtalo de nuevo.'
+  return 'No se pudo conectar con el servidor. ¿Está arrancado el backend? Inténtalo de nuevo.'
 }
 
 export const useAuthStore = defineStore('auth', {
