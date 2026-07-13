@@ -18,7 +18,11 @@ load_dotenv()
 
 app = Flask(__name__)
 
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL', 'sqlite:///academia.db')
+# Render entrega la URL como postgres:// pero SQLAlchemy exige postgresql://
+_db_url = os.environ.get('DATABASE_URL', 'sqlite:///academia.db')
+if _db_url.startswith('postgres://'):
+    _db_url = _db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = _db_url
 # En producción (Render) hay que definir JWT_SECRET_KEY como variable de entorno
 app.config['JWT_SECRET_KEY'] = os.environ.get('JWT_SECRET_KEY', 'dev-solo-para-local')
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(days=7)

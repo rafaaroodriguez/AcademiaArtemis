@@ -1,6 +1,7 @@
 flask
 flask-cors
 flask-limiter
+psycopg2-binary
 python-dotenv
 stripe
 flask-sqlalchemy
