@@ -8,6 +8,7 @@ export interface Usuario {
   email: string
   nivel_id: number | null
   es_admin: boolean
+  cancelacion_pendiente: boolean
 }
 
 function mensajeDeError(error: unknown): string {
@@ -65,6 +66,18 @@ export const useAuthStore = defineStore('auth', {
         this.usuario = data.usuario
         localStorage.setItem('usuario', JSON.stringify(data.usuario))
         return true
+      } catch (error) {
+        throw new Error(mensajeDeError(error))
+      }
+    },
+    // Cancela la suscripción; devuelve el mensaje del servidor (con Stripe se
+    // mantiene el acceso hasta fin del periodo pagado)
+    async cancelarSuscripcion(): Promise<string> {
+      try {
+        const { data } = await api.post('/api/suscripcion/cancelar')
+        this.usuario = data.usuario
+        localStorage.setItem('usuario', JSON.stringify(data.usuario))
+        return data.mensaje
       } catch (error) {
         throw new Error(mensajeDeError(error))
       }

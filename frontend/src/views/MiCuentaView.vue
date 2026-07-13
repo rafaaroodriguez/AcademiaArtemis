@@ -14,6 +14,21 @@ const plan = computed(() =>
 
 const error = ref('')
 const cargando = ref(true)
+const mensajeCancelacion = ref('')
+const cancelando = ref(false)
+
+async function cancelarSuscripcion() {
+  if (!confirm('¿Seguro que quieres cancelar tu suscripción?')) return
+  mensajeCancelacion.value = ''
+  cancelando.value = true
+  try {
+    mensajeCancelacion.value = await auth.cancelarSuscripcion()
+  } catch (e) {
+    mensajeCancelacion.value = (e as Error).message
+  } finally {
+    cancelando.value = false
+  }
+}
 
 // Al entrar refrescamos el perfil desde el servidor: así detectamos
 // sesiones caducadas y siempre mostramos datos actualizados
@@ -66,15 +81,27 @@ function cerrarSesion() {
             <dt>Precio</dt>
             <dd>{{ plan.price }}€/mes</dd>
           </dl>
+          <p v-if="auth.usuario!.cancelacion_pendiente" class="aviso-cancelacion">
+            Cancelación programada: mantienes el acceso hasta el final del periodo ya pagado.
+          </p>
           <div class="acciones">
             <RouterLink :to="`/nivel/${plan.id}`" class="btn">Ir a mi contenido</RouterLink>
             <RouterLink to="/cursos" class="cambiar">Cambiar de plan</RouterLink>
+            <button
+              v-if="!auth.usuario!.cancelacion_pendiente"
+              class="cancelar"
+              :disabled="cancelando"
+              @click="cancelarSuscripcion"
+            >
+              {{ cancelando ? 'Cancelando...' : 'Cancelar suscripción' }}
+            </button>
           </div>
         </template>
         <template v-else>
           <p class="sin-plan">Todavía no tienes ninguna suscripción activa.</p>
           <RouterLink to="/cursos" class="btn">Ver planes</RouterLink>
         </template>
+        <p v-if="mensajeCancelacion" class="mensaje-cancelacion">{{ mensajeCancelacion }}</p>
       </div>
 
       <button class="salir" @click="cerrarSesion">Cerrar sesión</button>
@@ -134,6 +161,37 @@ dt {
 .cambiar {
   color: #f1502f;
   font-weight: bold;
+}
+.cancelar {
+  background: none;
+  border: 1px solid #ccc;
+  color: #777;
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.cancelar:hover {
+  border-color: #c0392b;
+  color: #c0392b;
+}
+.cancelar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.aviso-cancelacion {
+  background: #fff6e5;
+  border: 1px solid #f0c36d;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #7a5b13;
+  font-size: 0.95rem;
+  margin-bottom: 12px;
+}
+.mensaje-cancelacion {
+  margin-top: 12px;
+  color: #555;
+  font-size: 0.95rem;
 }
 .btn {
   display: inline-block;

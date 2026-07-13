@@ -36,6 +36,10 @@ if STRIPE_SECRET_KEY:
 else:
     print("[Config] Stripe: NO configurado — los planes se activan directamente sin pago (solo desarrollo)")
 
+# Secreto de firma del webhook de Stripe (whsec_...). En local lo da
+# 'stripe listen'; en producción, el panel de Stripe al crear el endpoint.
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
 CORS(app)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -49,6 +53,11 @@ class Usuario(db.Model):
     # Nivel contratado (1=ESO, 2=Bachillerato, 3=Universidad); None = sin suscripción
     nivel_id = db.Column(db.Integer, nullable=True)
     es_admin = db.Column(db.Boolean, nullable=False, default=False)
+    # Identificadores de Stripe para gestionar la suscripción recurrente
+    stripe_customer_id = db.Column(db.String(120), nullable=True)
+    stripe_subscription_id = db.Column(db.String(120), nullable=True)
+    # True cuando el alumno canceló: mantiene acceso hasta fin del periodo pagado
+    cancelacion_pendiente = db.Column(db.Boolean, nullable=False, default=False)
 
     def a_dict(self):
         return {
@@ -57,6 +66,7 @@ class Usuario(db.Model):
             "email": self.email,
             "nivel_id": self.nivel_id,
             "es_admin": self.es_admin,
+            "cancelacion_pendiente": self.cancelacion_pendiente,
         }
 
 
@@ -133,6 +143,12 @@ with app.app_context():
             conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN nivel_id INTEGER"))
         if "es_admin" not in columnas:
             conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN es_admin BOOLEAN NOT NULL DEFAULT 0"))
+        if "stripe_customer_id" not in columnas:
+            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN stripe_customer_id VARCHAR(120)"))
+        if "stripe_subscription_id" not in columnas:
+            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN stripe_subscription_id VARCHAR(120)"))
+        if "cancelacion_pendiente" not in columnas:
+            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN cancelacion_pendiente BOOLEAN NOT NULL DEFAULT 0"))
         conexion.commit()
     if Asignatura.query.count() == 0:
         cargar_contenido_de_ejemplo()
@@ -289,6 +305,9 @@ def confirmar_checkout():
             return jsonify({"error": "El pago no se ha completado"}), 400
 
         usuario.nivel_id = nivel_id_pago
+        usuario.stripe_customer_id = valor_stripe(sesion, 'customer')
+        usuario.stripe_subscription_id = valor_stripe(sesion, 'subscription')
+        usuario.cancelacion_pendiente = False
         db.session.commit()
         return jsonify({"usuario": usuario.a_dict()})
     except Exception as error:
@@ -316,6 +335,15 @@ def contenido_nivel(nivel_id):
         "nivel": nivel,
         "asignaturas": [a.a_dict() for a in asignaturas],
     })
+
+
+def valor_stripe(objeto, clave, defecto=None):
+    """Lee una clave de un objeto de Stripe. Los StripeObject no siempre
+    exponen .get(), así que solo es seguro el acceso con corchetes."""
+    try:
+        return objeto[clave]
+    except (KeyError, TypeError):
+        return defecto
 
 
 def serializador_recuperacion():
@@ -378,6 +406,98 @@ def restablecer():
     usuario.password_hash = generate_password_hash(password)
     db.session.commit()
     return jsonify({"mensaje": "Contraseña actualizada. Ya puedes iniciar sesión."})
+
+
+@app.route('/api/suscripcion/cancelar', methods=['POST'])
+@jwt_required()
+def cancelar_suscripcion():
+    usuario = usuario_del_token()
+    if not usuario:
+        return jsonify({"error": "Tu cuenta ya no existe. Regístrate de nuevo"}), 401
+    if not usuario.nivel_id:
+        return jsonify({"error": "No tienes ninguna suscripción activa"}), 400
+
+    if STRIPE_SECRET_KEY and usuario.stripe_subscription_id:
+        # Cancelación al final del periodo: el alumno conserva el acceso que
+        # ya ha pagado; cuando Stripe la cierre, el webhook quitará el plan
+        try:
+            stripe.Subscription.modify(usuario.stripe_subscription_id, cancel_at_period_end=True)
+        except stripe.StripeError as error:
+            app.logger.error(f"Error de Stripe al cancelar {usuario.stripe_subscription_id}: {error}")
+            return jsonify({"error": "No se pudo cancelar la suscripción. Inténtalo de nuevo en unos minutos"}), 502
+        usuario.cancelacion_pendiente = True
+        db.session.commit()
+        return jsonify({
+            "usuario": usuario.a_dict(),
+            "mensaje": "Suscripción cancelada. Mantienes el acceso hasta el final del periodo ya pagado.",
+        })
+
+    # Sin Stripe (desarrollo) o plan activado sin pago: cancelación inmediata
+    usuario.nivel_id = None
+    usuario.stripe_subscription_id = None
+    usuario.cancelacion_pendiente = False
+    db.session.commit()
+    return jsonify({"usuario": usuario.a_dict(), "mensaje": "Suscripción cancelada."})
+
+
+@app.route('/api/stripe/webhook', methods=['POST'])
+def stripe_webhook():
+    """Stripe llama aquí cuando pasa algo con las suscripciones (pago completado,
+    cancelación, impago...). La firma garantiza que la llamada es de Stripe."""
+    if not STRIPE_WEBHOOK_SECRET:
+        return jsonify({"error": "Webhook no configurado"}), 503
+    try:
+        evento = stripe.Webhook.construct_event(
+            request.data,
+            request.headers.get('Stripe-Signature', ''),
+            STRIPE_WEBHOOK_SECRET,
+        )
+    except Exception:
+        return jsonify({"error": "Firma no válida"}), 400
+
+    tipo = evento['type']
+    objeto = evento['data']['object']
+
+    if tipo == 'checkout.session.completed':
+        # Activación de respaldo: cubre el caso de que el alumno pague pero
+        # cierre el navegador antes de volver a la web
+        metadatos = valor_stripe(objeto, 'metadata') or {}
+        usuario = db.session.get(Usuario, int(valor_stripe(metadatos, 'usuario_id') or 0))
+        nivel_id = valor_stripe(metadatos, 'nivel_id')
+        if usuario and nivel_id and valor_stripe(objeto, 'payment_status') == 'paid':
+            usuario.nivel_id = int(nivel_id)
+            usuario.stripe_customer_id = valor_stripe(objeto, 'customer')
+            usuario.stripe_subscription_id = valor_stripe(objeto, 'subscription')
+            usuario.cancelacion_pendiente = False
+            db.session.commit()
+
+    elif tipo == 'customer.subscription.deleted':
+        # La suscripción terminó (canceló y venció el periodo, o impago agotado)
+        usuario = Usuario.query.filter_by(stripe_subscription_id=valor_stripe(objeto, 'id')).first()
+        if usuario:
+            usuario.nivel_id = None
+            usuario.stripe_subscription_id = None
+            usuario.cancelacion_pendiente = False
+            db.session.commit()
+
+    elif tipo == 'customer.subscription.updated':
+        usuario = Usuario.query.filter_by(stripe_subscription_id=valor_stripe(objeto, 'id')).first()
+        if usuario:
+            estado = valor_stripe(objeto, 'status')
+            if estado in ('canceled', 'unpaid', 'incomplete_expired'):
+                usuario.nivel_id = None
+                usuario.stripe_subscription_id = None
+                usuario.cancelacion_pendiente = False
+            else:
+                # Refleja si hay una cancelación programada (o si se reactivó)
+                usuario.cancelacion_pendiente = bool(valor_stripe(objeto, 'cancel_at_period_end'))
+            db.session.commit()
+
+    elif tipo == 'invoice.payment_failed':
+        app.logger.warning(f"Cobro mensual fallido: {valor_stripe(objeto, 'customer')} "
+                           f"(Stripe reintentará; si agota los reintentos llegará subscription.deleted)")
+
+    return jsonify({"ok": True})
 
 
 @app.route('/api/perfil', methods=['GET'])
