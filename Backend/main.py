@@ -8,6 +8,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -43,6 +45,21 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 CORS(app)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+
+# Límite de intentos por IP en los endpoints sensibles (fuerza bruta).
+# En memoria: suficiente con un solo proceso; en producción con varios
+# workers convendría un almacenamiento compartido (Redis).
+limiter = Limiter(
+    get_remote_address,
+    app=app,
+    storage_uri="memory://",
+    enabled=os.environ.get('RATELIMIT_ENABLED', '1') != '0',
+)
+
+
+@app.errorhandler(429)
+def limite_alcanzado(_error):
+    return jsonify({"error": "Demasiados intentos. Espera un minuto y vuelve a intentarlo"}), 429
 
 
 class Usuario(db.Model):
@@ -195,6 +212,7 @@ def obtener_perfil():
 
 
 @app.route('/api/registro', methods=['POST'])
+@limiter.limit("10 per minute")
 def registro():
     datos = request.get_json(silent=True) or {}
     nombre = (datos.get('nombre') or '').strip()
@@ -222,6 +240,7 @@ def registro():
 
 
 @app.route('/api/login', methods=['POST'])
+@limiter.limit("10 per minute")
 def login():
     datos = request.get_json(silent=True) or {}
     email = (datos.get('email') or '').strip().lower()
@@ -376,6 +395,7 @@ def enviar_email_recuperacion(destinatario, enlace):
 
 
 @app.route('/api/recuperar', methods=['POST'])
+@limiter.limit("5 per minute")
 def recuperar():
     email = ((request.get_json(silent=True) or {}).get('email') or '').strip().lower()
     usuario = Usuario.query.filter_by(email=email).first()
@@ -545,6 +565,20 @@ def admin_crear_asignatura():
     return jsonify({"asignatura": asignatura.a_dict()}), 201
 
 
+@app.route('/api/admin/asignaturas/<int:asignatura_id>', methods=['PUT'])
+@requiere_admin
+def admin_renombrar_asignatura(asignatura_id):
+    asignatura = db.session.get(Asignatura, asignatura_id)
+    if not asignatura:
+        return jsonify({"error": "Esa asignatura no existe"}), 404
+    nombre = ((request.get_json(silent=True) or {}).get('nombre') or '').strip()
+    if not nombre:
+        return jsonify({"error": "El nombre no puede estar vacío"}), 400
+    asignatura.nombre = nombre
+    db.session.commit()
+    return jsonify({"asignatura": asignatura.a_dict()})
+
+
 @app.route('/api/admin/asignaturas/<int:asignatura_id>', methods=['DELETE'])
 @requiere_admin
 def admin_borrar_asignatura(asignatura_id):
@@ -579,6 +613,44 @@ def admin_crear_tema(asignatura_id):
     db.session.add(tema)
     db.session.commit()
     return jsonify({"tema": tema.a_dict()}), 201
+
+
+@app.route('/api/admin/temas/<int:tema_id>', methods=['PUT'])
+@requiere_admin
+def admin_editar_tema(tema_id):
+    tema = db.session.get(Tema, tema_id)
+    if not tema:
+        return jsonify({"error": "Ese tema no existe"}), 404
+    datos = request.get_json(silent=True) or {}
+    titulo = (datos.get('titulo') or '').strip()
+    if not titulo:
+        return jsonify({"error": "El título es obligatorio"}), 400
+    tema.titulo = titulo
+    tema.descripcion = (datos.get('descripcion') or '').strip()
+    tema.material_url = (datos.get('material_url') or '').strip()
+    db.session.commit()
+    return jsonify({"tema": tema.a_dict()})
+
+
+@app.route('/api/admin/temas/<int:tema_id>/mover', methods=['POST'])
+@requiere_admin
+def admin_mover_tema(tema_id):
+    tema = db.session.get(Tema, tema_id)
+    if not tema:
+        return jsonify({"error": "Ese tema no existe"}), 404
+    direccion = (request.get_json(silent=True) or {}).get('direccion')
+    if direccion not in ('subir', 'bajar'):
+        return jsonify({"error": "La dirección debe ser 'subir' o 'bajar'"}), 400
+
+    hermanos = sorted(tema.asignatura.temas, key=lambda t: t.orden)
+    indice = hermanos.index(tema)
+    vecino = indice - 1 if direccion == 'subir' else indice + 1
+    if vecino < 0 or vecino >= len(hermanos):
+        return jsonify({"error": "El tema ya está en el extremo"}), 400
+
+    tema.orden, hermanos[vecino].orden = hermanos[vecino].orden, tema.orden
+    db.session.commit()
+    return jsonify({"ok": True})
 
 
 @app.route('/api/admin/temas/<int:tema_id>', methods=['DELETE'])

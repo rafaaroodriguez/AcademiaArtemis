@@ -95,6 +95,51 @@ async function crearTema(asignaturaId: number) {
   }
 }
 
+const editandoTema = ref<number | null>(null)
+const formEdicion = ref({ titulo: '', descripcion: '', material_url: '' })
+
+function empezarEdicion(tema: Tema) {
+  editandoTema.value = tema.id
+  formEdicion.value = {
+    titulo: tema.titulo,
+    descripcion: tema.descripcion,
+    material_url: tema.material_url,
+  }
+}
+
+async function guardarTema(temaId: number) {
+  error.value = ''
+  try {
+    await api.put(`/api/admin/temas/${temaId}`, formEdicion.value)
+    editandoTema.value = null
+    await cargarContenido()
+  } catch (e) {
+    error.value = mensaje(e)
+  }
+}
+
+async function moverTema(temaId: number, direccion: 'subir' | 'bajar') {
+  error.value = ''
+  try {
+    await api.post(`/api/admin/temas/${temaId}/mover`, { direccion })
+    await cargarContenido()
+  } catch (e) {
+    error.value = mensaje(e)
+  }
+}
+
+async function renombrarAsignatura(asignatura: Asignatura) {
+  const nombre = prompt('Nuevo nombre de la asignatura:', asignatura.nombre)
+  if (!nombre || nombre.trim() === asignatura.nombre) return
+  error.value = ''
+  try {
+    await api.put(`/api/admin/asignaturas/${asignatura.id}`, { nombre })
+    await cargarContenido()
+  } catch (e) {
+    error.value = mensaje(e)
+  }
+}
+
 async function borrarAlumno(alumno: Usuario) {
   if (!confirm(`¿Borrar la cuenta de ${alumno.nombre} (${alumno.email})?`)) return
   error.value = ''
@@ -177,12 +222,37 @@ onMounted(async () => {
       <div v-for="asignatura in asignaturas" :key="asignatura.id" class="asignatura">
         <div class="cabecera">
           <h3>{{ asignatura.nombre }}</h3>
-          <button class="borrar" @click="borrarAsignatura(asignatura.id)">Borrar asignatura</button>
+          <div class="botones">
+            <button class="accion" @click="renombrarAsignatura(asignatura)">Renombrar</button>
+            <button class="borrar" @click="borrarAsignatura(asignatura.id)">Borrar asignatura</button>
+          </div>
         </div>
         <ul>
-          <li v-for="tema in asignatura.temas" :key="tema.id">
-            <span>{{ tema.titulo }}</span>
-            <button class="borrar" @click="borrarTema(tema.id)">Borrar</button>
+          <li v-for="(tema, indice) in asignatura.temas" :key="tema.id">
+            <template v-if="editandoTema !== tema.id">
+              <span>{{ tema.titulo }}</span>
+              <div class="botones">
+                <button class="accion" :disabled="indice === 0" @click="moverTema(tema.id, 'subir')">↑</button>
+                <button
+                  class="accion"
+                  :disabled="indice === asignatura.temas.length - 1"
+                  @click="moverTema(tema.id, 'bajar')"
+                >
+                  ↓
+                </button>
+                <button class="accion" @click="empezarEdicion(tema)">Editar</button>
+                <button class="borrar" @click="borrarTema(tema.id)">Borrar</button>
+              </div>
+            </template>
+            <form v-else class="edicion" @submit.prevent="guardarTema(tema.id)">
+              <input v-model="formEdicion.titulo" placeholder="Título" required />
+              <input v-model="formEdicion.descripcion" placeholder="Descripción (opcional)" />
+              <input v-model="formEdicion.material_url" placeholder="URL del material (opcional)" />
+              <div class="botones">
+                <button type="submit" class="guardar">Guardar</button>
+                <button type="button" class="accion" @click="editandoTema = null">Cancelar</button>
+              </div>
+            </form>
           </li>
         </ul>
         <form class="nuevo-tema" @submit.prevent="crearTema(asignatura.id)">
@@ -295,6 +365,12 @@ li {
   padding: 6px 0;
   border-bottom: 1px solid #f5f5f5;
 }
+.botones {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.accion,
 .borrar {
   background: none;
   border: 1px solid #ccc;
@@ -303,6 +379,37 @@ li {
   padding: 4px 10px;
   cursor: pointer;
   font-size: 0.8rem;
+}
+.accion:hover:not(:disabled) {
+  border-color: #f1502f;
+  color: #f1502f;
+}
+.accion:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.edicion {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  width: 100%;
+}
+.edicion input {
+  flex: 1;
+  min-width: 140px;
+  padding: 6px 10px;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+}
+.guardar {
+  background: #f1502f;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 4px 12px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: bold;
 }
 .borrar:hover {
   border-color: #c0392b;
