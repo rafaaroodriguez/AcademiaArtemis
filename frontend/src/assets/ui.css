@@ -1,4 +1,36 @@
-/* Efectos de interfaz compartidos (estilo uiverse.io), adaptados al color de marca */
+/* ==========================================================================
+   Sistema de diseño de Academia Artemis
+   Variables + base tipográfica + efectos compartidos
+   ========================================================================== */
+
+:root {
+  --marca: #f1502f;
+  --marca-oscuro: #d8431f;
+  --marca-suave: #fff1ed;
+  --tinta: #111827;
+  --texto: #374151;
+  --texto-suave: #6b7280;
+  --borde: #e5e7eb;
+  --fondo-suave: #f9fafb;
+  --oscuro: #171f2e;
+  --radio: 14px;
+  --sombra: 0 1px 3px rgba(17, 24, 39, 0.08), 0 8px 24px rgba(17, 24, 39, 0.06);
+  --sombra-alta: 0 4px 12px rgba(17, 24, 39, 0.1), 0 16px 40px rgba(17, 24, 39, 0.12);
+}
+
+body {
+  font-family: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  color: var(--texto);
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3 {
+  color: var(--tinta);
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+}
 
 /* --- Botones .btn: elevación + barrido de brillo al pasar el ratón --- */
 .btn {
@@ -6,7 +38,8 @@
   overflow: hidden;
   transition:
     transform 0.2s ease,
-    box-shadow 0.2s ease;
+    box-shadow 0.2s ease,
+    background 0.2s ease;
 }
 .btn:hover {
   transform: translateY(-2px);
@@ -47,8 +80,8 @@
 .feature:hover,
 .canal:hover {
   transform: translateY(-6px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
-  border-color: #f1502f;
+  box-shadow: var(--sombra-alta);
+  border-color: var(--marca);
 }
 
 /* --- Enlaces de la barra de navegación: subrayado animado --- */
@@ -62,7 +95,7 @@
   bottom: -4px;
   width: 100%;
   height: 2px;
-  background: #f1502f;
+  background: var(--marca);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform 0.25s ease;
@@ -78,7 +111,7 @@
   width: 42px;
   height: 42px;
   border: 4px solid rgba(241, 80, 47, 0.2);
-  border-top-color: #f1502f;
+  border-top-color: var(--marca);
   border-radius: 50%;
   animation: giro 0.8s linear infinite;
 }
@@ -92,6 +125,6 @@
   flex-direction: column;
   align-items: center;
   gap: 12px;
-  color: #888;
+  color: var(--texto-suave);
   padding: 20px 0;
 }

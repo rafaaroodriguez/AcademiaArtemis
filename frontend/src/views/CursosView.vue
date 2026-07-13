@@ -40,10 +40,20 @@ async function elegirPlan(nivelId: number) {
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="tiers-grid">
-      <div v-for="tier in academy.tiers" :key="tier.id" class="card">
+      <div
+        v-for="tier in academy.tiers"
+        :key="tier.id"
+        class="card"
+        :class="{ popular: tier.id === 2 }"
+      >
+        <p v-if="tier.id === 2" class="etiqueta-popular">El más elegido</p>
         <h2>{{ tier.name }}</h2>
         <p class="price">{{ tier.price }}€<span class="per">/mes</span></p>
-        <p class="benefits">{{ tier.benefits }}</p>
+        <ul class="ventajas">
+          <li>{{ tier.benefits }}</li>
+          <li>Temario por asignaturas</li>
+          <li>Sin permanencia</li>
+        </ul>
 
         <!-- Sin sesión: a registrarse -->
         <RouterLink v-if="!auth.estaLogueado" to="/registro" class="btn">Apuntarme</RouterLink>
@@ -96,39 +106,83 @@ async function elegirPlan(nivelId: number) {
   margin-top: 40px;
 }
 .card {
-  border: 1px solid #ddd;
-  padding: 24px;
-  border-radius: 12px;
-  width: 220px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  position: relative;
+  border: 1px solid var(--borde);
+  padding: 32px 28px;
+  border-radius: var(--radio);
+  width: 260px;
+  background: white;
+  box-shadow: var(--sombra);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  text-align: left;
+}
+.card h2 {
+  font-size: 1.15rem;
+}
+.card.popular {
+  border-color: var(--marca);
+  box-shadow: 0 8px 28px rgba(241, 80, 47, 0.18);
+}
+.etiqueta-popular {
+  position: absolute;
+  top: -13px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--marca);
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 4px 14px;
+  border-radius: 999px;
+  white-space: nowrap;
 }
 .price {
-  font-size: 1.8rem;
-  font-weight: bold;
-  color: #f1502f;
+  font-size: 2.2rem;
+  font-weight: 800;
+  color: var(--tinta);
+  letter-spacing: -0.02em;
 }
 .per {
-  font-size: 0.9rem;
-  color: #888;
+  font-size: 0.95rem;
+  color: var(--texto-suave);
   font-weight: normal;
 }
-.benefits {
-  color: #555;
+.ventajas {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
   flex-grow: 1;
+  padding: 0;
+}
+.ventajas li {
+  color: var(--texto-suave);
+  font-size: 0.93rem;
+  padding-left: 26px;
+  position: relative;
+  line-height: 1.45;
+}
+.ventajas li::before {
+  content: '✓';
+  position: absolute;
+  left: 0;
+  color: var(--marca);
+  font-weight: 800;
 }
 .btn {
-  background: #f1502f;
+  background: var(--marca);
   color: white;
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: 12px 20px;
+  border-radius: 10px;
   text-decoration: none;
-  font-weight: bold;
+  font-weight: 700;
   border: none;
-  font-size: 1rem;
+  font-size: 0.98rem;
   cursor: pointer;
+  text-align: center;
+  font-family: inherit;
 }
 .btn:disabled {
   opacity: 0.6;
