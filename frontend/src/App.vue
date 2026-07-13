@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref } from 'vue'
 import { RouterLink, RouterView, useRouter } from 'vue-router'
 import { useAcademyStore } from './stores/useAcademy'
 import { useAuthStore } from './stores/useAuth'
@@ -13,6 +13,8 @@ onMounted(() => {
   academy.fetchInfo()
 })
 
+const menuAbierto = ref(false)
+
 function cerrarSesion() {
   auth.logout()
   router.push('/')
@@ -22,7 +24,14 @@ function cerrarSesion() {
 <template>
   <header class="navbar">
     <RouterLink to="/" class="logo">Academia Artemis</RouterLink>
-    <nav>
+    <button
+      class="menu-btn"
+      aria-label="Abrir menú"
+      @click="menuAbierto = !menuAbierto"
+    >
+      ☰
+    </button>
+    <nav :class="{ abierta: menuAbierto }" @click="menuAbierto = false">
       <RouterLink to="/">Inicio</RouterLink>
       <RouterLink to="/cursos">Cursos</RouterLink>
       <RouterLink to="/contacto">Contacto</RouterLink>
@@ -118,6 +127,30 @@ nav {
 .salir:hover {
   border-color: #f1502f;
   color: #f1502f;
+}
+.menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  font-size: 1.6rem;
+  cursor: pointer;
+  color: #333;
+}
+@media (max-width: 720px) {
+  .menu-btn {
+    display: block;
+  }
+  .navbar nav {
+    display: none;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding-top: 8px;
+  }
+  .navbar nav.abierta {
+    display: flex;
+  }
 }
 main {
   min-height: calc(100vh - 130px);
