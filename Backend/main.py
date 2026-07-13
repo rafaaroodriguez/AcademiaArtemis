@@ -32,6 +32,9 @@ FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:5173').rstrip('/
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 if STRIPE_SECRET_KEY:
     stripe.api_key = STRIPE_SECRET_KEY
+    print("[Config] Stripe: configurado — los planes se contratan por la pasarela de pago")
+else:
+    print("[Config] Stripe: NO configurado — los planes se activan directamente sin pago (solo desarrollo)")
 
 CORS(app)
 db = SQLAlchemy(app)
