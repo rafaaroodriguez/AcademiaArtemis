@@ -88,7 +88,7 @@ label {
 }
 input {
   padding: 10px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--borde);
   border-radius: 8px;
   font-size: 1rem;
 }
@@ -98,7 +98,7 @@ input:focus {
 }
 button,
 .btn {
-  background: #f1502f;
+  background: var(--marca);
   color: white;
   border: none;
   padding: 12px;

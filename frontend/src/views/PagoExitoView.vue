@@ -70,7 +70,7 @@ onMounted(verificar)
   margin-bottom: 16px;
 }
 .detalle {
-  color: #555;
+  color: var(--texto-suave);
   margin-bottom: 16px;
 }
 .error {
@@ -79,7 +79,7 @@ onMounted(verificar)
 }
 .btn {
   display: inline-block;
-  background: #f1502f;
+  background: var(--marca);
   color: white;
   padding: 12px 24px;
   border-radius: 8px;
@@ -93,11 +93,11 @@ onMounted(verificar)
 .secundario {
   display: block;
   margin-top: 16px;
-  color: #f1502f;
+  color: var(--marca);
   font-weight: bold;
 }
 .detalle a {
-  color: #f1502f;
+  color: var(--marca);
   font-weight: bold;
 }
 </style>

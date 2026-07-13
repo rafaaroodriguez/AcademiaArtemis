@@ -60,7 +60,7 @@ async function enviar() {
   margin-bottom: 12px;
 }
 .explicacion {
-  color: #555;
+  color: var(--texto-suave);
   margin-bottom: 24px;
 }
 form {
@@ -78,7 +78,7 @@ label {
 }
 input {
   padding: 10px 12px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--borde);
   border-radius: 8px;
   font-size: 1rem;
 }
@@ -87,7 +87,7 @@ input:focus {
   border-color: transparent;
 }
 button {
-  background: #f1502f;
+  background: var(--marca);
   color: white;
   border: none;
   padding: 12px;
@@ -112,7 +112,7 @@ button:disabled {
   margin-top: 24px;
 }
 .cambio a {
-  color: #f1502f;
+  color: var(--marca);
   font-weight: bold;
 }
 </style>

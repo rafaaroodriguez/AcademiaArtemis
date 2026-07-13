@@ -150,7 +150,7 @@ const auth = useAuthStore()
 .btn-secondary {
   border: 2px solid var(--borde);
   color: var(--tinta);
-  background: white;
+  background: var(--superficie);
 }
 .cifras {
   display: flex;
@@ -198,7 +198,7 @@ const auth = useAuthStore()
   padding: 28px;
   border: 1px solid var(--borde);
   border-radius: var(--radio);
-  background: white;
+  background: var(--superficie);
   box-shadow: var(--sombra);
 }
 .icono {
@@ -280,6 +280,7 @@ const auth = useAuthStore()
 }
 .btn-claro {
   display: inline-block;
+  /* Siempre blanco: va sobre el degradado naranja en ambos temas */
   background: white;
   color: var(--marca-oscuro);
 }

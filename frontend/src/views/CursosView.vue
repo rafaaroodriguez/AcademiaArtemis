@@ -86,13 +86,13 @@ async function elegirPlan(nivelId: number) {
   margin-bottom: 12px;
 }
 .intro {
-  color: #555;
+  color: var(--texto-suave);
   max-width: 560px;
   margin: 0 auto;
 }
 .loading {
   margin-top: 40px;
-  color: #888;
+  color: var(--texto-suave);
 }
 .error {
   margin-top: 20px;
@@ -111,7 +111,7 @@ async function elegirPlan(nivelId: number) {
   padding: 32px 28px;
   border-radius: var(--radio);
   width: 260px;
-  background: white;
+  background: var(--superficie);
   box-shadow: var(--sombra);
   display: flex;
   flex-direction: column;

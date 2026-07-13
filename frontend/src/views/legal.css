@@ -10,12 +10,12 @@
 }
 .legal h2 {
   font-size: 1.2rem;
-  color: #f1502f;
+  color: var(--marca);
   margin: 28px 0 10px;
 }
 .legal p,
 .legal li {
-  color: #444;
+  color: var(--texto);
   line-height: 1.6;
 }
 .legal ul {

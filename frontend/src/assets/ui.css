@@ -11,17 +11,52 @@
   --texto: #374151;
   --texto-suave: #6b7280;
   --borde: #e5e7eb;
+  --fondo: #ffffff;
   --fondo-suave: #f9fafb;
+  --superficie: #ffffff;
+  --nav-fondo: rgba(255, 255, 255, 0.85);
   --oscuro: #171f2e;
   --radio: 14px;
   --sombra: 0 1px 3px rgba(17, 24, 39, 0.08), 0 8px 24px rgba(17, 24, 39, 0.06);
   --sombra-alta: 0 4px 12px rgba(17, 24, 39, 0.1), 0 16px 40px rgba(17, 24, 39, 0.12);
 }
 
+/* Tema oscuro: mismas variables, valores nocturnos. Se activa con
+   data-theme="dark" en <html> (botón de la barra de navegación). */
+:root[data-theme='dark'] {
+  --marca-suave: rgba(241, 80, 47, 0.16);
+  --tinta: #f1f5f9;
+  --texto: #cbd5e1;
+  --texto-suave: #94a3b8;
+  --borde: #2a3446;
+  --fondo: #0f1420;
+  --fondo-suave: #141b29;
+  --superficie: #1a2231;
+  --nav-fondo: rgba(15, 20, 32, 0.85);
+  --sombra: 0 1px 3px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.3);
+  --sombra-alta: 0 4px 12px rgba(0, 0, 0, 0.45), 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
 body {
   font-family: 'Inter Variable', system-ui, -apple-system, 'Segoe UI', sans-serif;
   color: var(--texto);
+  background: var(--fondo);
+  transition:
+    background-color 0.25s ease,
+    color 0.25s ease;
   -webkit-font-smoothing: antialiased;
+}
+
+input,
+textarea,
+select {
+  background: var(--superficie);
+  color: var(--texto);
+  font-family: inherit;
+}
+
+button {
+  font-family: inherit;
 }
 
 h1,

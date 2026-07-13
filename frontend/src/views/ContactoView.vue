@@ -37,7 +37,7 @@ const telefonoLink = telefono.replace(/ /g, '')
   margin-bottom: 12px;
 }
 .intro {
-  color: #555;
+  color: var(--texto-suave);
   max-width: 560px;
   margin: 0 auto;
 }
@@ -51,20 +51,20 @@ const telefonoLink = telefono.replace(/ /g, '')
 .canal {
   width: 240px;
   padding: 24px;
-  border: 1px solid #eee;
+  border: 1px solid var(--borde);
   border-radius: 12px;
 }
 .canal h2 {
   font-size: 1.1rem;
-  color: #f1502f;
+  color: var(--marca);
   margin-bottom: 8px;
 }
 .canal a {
-  color: #333;
+  color: var(--tinta);
   text-decoration: none;
   font-weight: bold;
 }
 .canal p {
-  color: #555;
+  color: var(--texto-suave);
 }
 </style>

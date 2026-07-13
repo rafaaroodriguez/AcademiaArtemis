@@ -288,14 +288,14 @@ onMounted(async () => {
   margin-bottom: 16px;
 }
 .panel {
-  border: 1px solid #eee;
+  border: 1px solid var(--borde);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 24px;
 }
 .panel h2 {
   font-size: 1.2rem;
-  color: #f1502f;
+  color: var(--marca);
   margin-bottom: 16px;
 }
 table {
@@ -307,13 +307,13 @@ th,
 td {
   text-align: left;
   padding: 8px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid var(--borde);
 }
 .acciones-fila {
   text-align: right;
 }
 .etiqueta {
-  background: #f1502f;
+  background: var(--marca);
   color: white;
   font-size: 0.7rem;
   padding: 2px 6px;
@@ -328,19 +328,19 @@ td {
 }
 .niveles button {
   padding: 8px 16px;
-  border: 1px solid #ccc;
-  background: white;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
   border-radius: 8px;
   cursor: pointer;
 }
 .niveles button.activo {
-  background: #f1502f;
-  border-color: #f1502f;
+  background: var(--marca);
+  border-color: var(--marca);
   color: white;
   font-weight: bold;
 }
 .asignatura {
-  border: 1px solid #eee;
+  border: 1px solid var(--borde);
   border-radius: 10px;
   padding: 16px;
   margin-bottom: 16px;
@@ -363,7 +363,7 @@ li {
   justify-content: space-between;
   align-items: center;
   padding: 6px 0;
-  border-bottom: 1px solid #f5f5f5;
+  border-bottom: 1px solid var(--borde);
 }
 .botones {
   display: flex;
@@ -372,17 +372,17 @@ li {
 }
 .accion,
 .borrar {
-  background: none;
-  border: 1px solid #ccc;
-  color: #777;
+  background: transparent;
+  border: 1px solid var(--borde);
+  color: var(--texto-suave);
   border-radius: 6px;
   padding: 4px 10px;
   cursor: pointer;
   font-size: 0.8rem;
 }
 .accion:hover:not(:disabled) {
-  border-color: #f1502f;
-  color: #f1502f;
+  border-color: var(--marca);
+  color: var(--marca);
 }
 .accion:disabled {
   opacity: 0.4;
@@ -398,11 +398,11 @@ li {
   flex: 1;
   min-width: 140px;
   padding: 6px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--borde);
   border-radius: 6px;
 }
 .guardar {
-  background: #f1502f;
+  background: var(--marca);
   color: white;
   border: none;
   border-radius: 6px;
@@ -426,12 +426,12 @@ li {
   flex: 1;
   min-width: 160px;
   padding: 8px 10px;
-  border: 1px solid #ccc;
+  border: 1px solid var(--borde);
   border-radius: 8px;
 }
 .nuevo-tema button,
 .nueva-asignatura button {
-  background: #f1502f;
+  background: var(--marca);
   color: white;
   border: none;
   padding: 8px 16px;

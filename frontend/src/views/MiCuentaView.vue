@@ -122,20 +122,20 @@ function cerrarSesion() {
 }
 .aviso {
   text-align: center;
-  color: #888;
+  color: var(--texto-suave);
 }
 .error {
   color: #c0392b;
 }
 .panel {
-  border: 1px solid #eee;
+  border: 1px solid var(--borde);
   border-radius: 12px;
   padding: 24px;
   margin-bottom: 20px;
 }
 .panel h2 {
   font-size: 1.1rem;
-  color: #f1502f;
+  color: var(--marca);
   margin-bottom: 16px;
 }
 dl {
@@ -145,10 +145,10 @@ dl {
 }
 dt {
   font-weight: bold;
-  color: #555;
+  color: var(--texto-suave);
 }
 .sin-plan {
-  color: #555;
+  color: var(--texto-suave);
   margin-bottom: 16px;
 }
 .acciones {
@@ -159,13 +159,13 @@ dt {
   flex-wrap: wrap;
 }
 .cambiar {
-  color: #f1502f;
+  color: var(--marca);
   font-weight: bold;
 }
 .cancelar {
-  background: none;
-  border: 1px solid #ccc;
-  color: #777;
+  background: transparent;
+  border: 1px solid var(--borde);
+  color: var(--texto-suave);
   border-radius: 8px;
   padding: 8px 14px;
   cursor: pointer;
@@ -190,12 +190,12 @@ dt {
 }
 .mensaje-cancelacion {
   margin-top: 12px;
-  color: #555;
+  color: var(--texto-suave);
   font-size: 0.95rem;
 }
 .btn {
   display: inline-block;
-  background: #f1502f;
+  background: var(--marca);
   color: white;
   padding: 10px 20px;
   border-radius: 8px;
@@ -205,15 +205,15 @@ dt {
 .salir {
   display: block;
   margin: 0 auto;
-  background: none;
-  border: 1px solid #ccc;
+  background: transparent;
+  border: 1px solid var(--borde);
   padding: 10px 20px;
   border-radius: 8px;
   cursor: pointer;
-  color: #555;
+  color: var(--texto-suave);
 }
 .salir:hover {
-  border-color: #f1502f;
-  color: #f1502f;
+  border-color: var(--marca);
+  color: var(--marca);
 }
 </style>

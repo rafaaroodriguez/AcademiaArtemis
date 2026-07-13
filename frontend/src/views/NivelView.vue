@@ -92,12 +92,12 @@ watch(() => route.params.id as string, cargar, { immediate: true })
 }
 .intro {
   text-align: center;
-  color: #555;
+  color: var(--texto-suave);
   margin: 12px 0 40px;
 }
 .aviso {
   text-align: center;
-  color: #888;
+  color: var(--texto-suave);
 }
 .error {
   color: #c0392b;
@@ -105,7 +105,7 @@ watch(() => route.params.id as string, cargar, { immediate: true })
 .volver {
   display: inline-block;
   margin-top: 12px;
-  color: #f1502f;
+  color: var(--marca);
   font-weight: bold;
 }
 .asignatura {
@@ -113,7 +113,7 @@ watch(() => route.params.id as string, cargar, { immediate: true })
 }
 .asignatura h2 {
   font-size: 1.3rem;
-  color: #f1502f;
+  color: var(--marca);
   border-bottom: 2px solid #f1502f;
   padding-bottom: 8px;
   margin-bottom: 16px;
@@ -125,20 +125,20 @@ ol {
   gap: 12px;
 }
 .tema {
-  border: 1px solid #eee;
+  border: 1px solid var(--borde);
   border-radius: 10px;
   padding: 16px;
 }
 .tema p {
-  color: #555;
+  color: var(--texto-suave);
   margin: 6px 0;
 }
 .tema a {
-  color: #f1502f;
+  color: var(--marca);
   font-weight: bold;
 }
 .pronto {
-  color: #999;
+  color: var(--texto-suave);
   font-size: 0.9rem;
   font-style: italic;
 }

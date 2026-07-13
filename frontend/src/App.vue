@@ -15,6 +15,17 @@ onMounted(() => {
 
 const menuAbierto = ref(false)
 
+// El tema inicial lo fija un script en index.html (antes de pintar nada);
+// aquí solo leemos el resultado y gestionamos el cambio
+const temaOscuro = ref(document.documentElement.dataset.theme === 'dark')
+
+function alternarTema() {
+  temaOscuro.value = !temaOscuro.value
+  const tema = temaOscuro.value ? 'dark' : 'light'
+  document.documentElement.dataset.theme = tema
+  localStorage.setItem('tema', tema)
+}
+
 function cerrarSesion() {
   auth.logout()
   router.push('/')
@@ -28,7 +39,17 @@ function cerrarSesion() {
         <span class="logo-marca">A</span>
         Academia Artemis
       </RouterLink>
-      <button class="menu-btn" aria-label="Abrir menú" @click="menuAbierto = !menuAbierto">☰</button>
+      <div class="nav-acciones">
+        <button
+          class="tema-btn"
+          :aria-label="temaOscuro ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'"
+          :title="temaOscuro ? 'Tema claro' : 'Tema oscuro'"
+          @click="alternarTema"
+        >
+          {{ temaOscuro ? '☀️' : '🌙' }}
+        </button>
+        <button class="menu-btn" aria-label="Abrir menú" @click="menuAbierto = !menuAbierto">☰</button>
+      </div>
       <nav :class="{ abierta: menuAbierto }" @click="menuAbierto = false">
         <RouterLink to="/">Inicio</RouterLink>
         <RouterLink to="/cursos">Cursos</RouterLink>
@@ -89,7 +110,7 @@ function cerrarSesion() {
   position: sticky;
   top: 0;
   z-index: 50;
-  background: rgba(255, 255, 255, 0.85);
+  background: var(--nav-fondo);
   backdrop-filter: blur(10px);
   border-bottom: 1px solid var(--borde);
 }
@@ -157,7 +178,7 @@ nav a.router-link-active {
   color: var(--texto-suave);
 }
 .salir {
-  background: none;
+  background: transparent;
   border: 1px solid var(--borde);
   padding: 7px 14px;
   border-radius: 10px;
@@ -170,17 +191,44 @@ nav a.router-link-active {
   border-color: var(--marca);
   color: var(--marca);
 }
+.nav-acciones {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  order: 3;
+}
+.tema-btn {
+  background: transparent;
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  width: 38px;
+  height: 38px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+.tema-btn:hover {
+  border-color: var(--marca);
+}
 .menu-btn {
   display: none;
-  background: none;
+  background: transparent;
   border: none;
   font-size: 1.6rem;
   cursor: pointer;
   color: var(--tinta);
 }
+@media (min-width: 721px) {
+  nav {
+    order: 2;
+  }
+}
 @media (max-width: 720px) {
   .menu-btn {
     display: block;
+  }
+  nav {
+    order: 4;
   }
   nav {
     display: none;
