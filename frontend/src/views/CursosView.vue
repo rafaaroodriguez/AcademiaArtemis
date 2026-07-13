@@ -33,7 +33,10 @@ async function elegirPlan(nivelId: number) {
     <h1>Nuestros cursos</h1>
     <p class="intro">Elige el nivel que se ajusta a tu etapa. Todos los planes son mensuales y sin permanencia.</p>
 
-    <p v-if="!academy.tiers.length" class="loading">Cargando niveles...</p>
+    <div v-if="!academy.tiers.length" class="cargando">
+      <span class="loader"></span>
+      <span>Cargando niveles...</span>
+    </div>
     <p v-if="error" class="error">{{ error }}</p>
 
     <div class="tiers-grid">

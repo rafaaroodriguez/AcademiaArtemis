@@ -40,7 +40,10 @@ function cerrarSesion() {
   <section class="cuenta">
     <h1>Mi cuenta</h1>
 
-    <p v-if="cargando" class="aviso">Cargando tus datos...</p>
+    <div v-if="cargando" class="cargando">
+      <span class="loader"></span>
+      <span>Cargando tus datos...</span>
+    </div>
     <p v-else-if="error" class="aviso error">{{ error }}</p>
 
     <template v-else-if="auth.usuario">

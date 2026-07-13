@@ -48,7 +48,10 @@ watch(() => route.params.id as string, cargar, { immediate: true })
 
 <template>
   <section class="nivel">
-    <p v-if="cargando" class="aviso">Cargando contenido...</p>
+    <div v-if="cargando" class="cargando">
+      <span class="loader"></span>
+      <span>Cargando contenido...</span>
+    </div>
     <div v-else-if="error" class="aviso">
       <p class="error">{{ error }}</p>
       <RouterLink to="/cursos" class="volver">Ver los planes disponibles</RouterLink>
