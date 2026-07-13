@@ -27,7 +27,8 @@ function cerrarSesion() {
       <RouterLink to="/cursos">Cursos</RouterLink>
       <RouterLink to="/contacto">Contacto</RouterLink>
       <template v-if="auth.estaLogueado">
-        <span class="saludo">Hola, {{ auth.usuario!.nombre }}</span>
+        <RouterLink v-if="auth.esAdmin" to="/admin">Admin</RouterLink>
+        <RouterLink to="/cuenta" class="saludo">Hola, {{ auth.usuario!.nombre }}</RouterLink>
         <button class="salir" @click="cerrarSesion">Cerrar sesión</button>
       </template>
       <template v-else>
@@ -43,6 +44,11 @@ function cerrarSesion() {
 
   <footer class="footer">
     <p>© {{ new Date().getFullYear() }} Academia Artemis · Academia 100% online</p>
+    <nav class="legal-links">
+      <RouterLink to="/aviso-legal">Aviso legal</RouterLink>
+      <RouterLink to="/privacidad">Privacidad</RouterLink>
+      <RouterLink to="/cookies">Cookies</RouterLink>
+    </nav>
   </footer>
 </template>
 
@@ -122,5 +128,18 @@ main {
   border-top: 1px solid #eee;
   color: #888;
   font-size: 0.9rem;
+}
+.legal-links {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.legal-links a {
+  color: #888;
+  text-decoration: none;
+}
+.legal-links a:hover {
+  color: #f1502f;
 }
 </style>

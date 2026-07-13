@@ -1,26 +1,32 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/useAuth'
+import { useRoute } from 'vue-router'
+import { isAxiosError } from 'axios'
+import { api } from '../lib/api'
 
-const auth = useAuthStore()
-const router = useRouter()
 const route = useRoute()
 
-const email = ref('')
 const password = ref('')
+const mensaje = ref('')
 const error = ref('')
 const enviando = ref(false)
 
 async function enviar() {
+  mensaje.value = ''
   error.value = ''
   enviando.value = true
   try {
-    await auth.login(email.value, password.value)
-    // Si venía de una página privada, le devolvemos a ella
-    router.push((route.query.redirect as string) || '/')
+    const { data } = await api.post('/api/restablecer', {
+      token: route.query.token || '',
+      password: password.value,
+    })
+    mensaje.value = data.mensaje
   } catch (e) {
-    error.value = (e as Error).message
+    if (isAxiosError(e) && e.response?.data?.error) {
+      error.value = e.response.data.error
+    } else {
+      error.value = 'No se pudo conectar con el servidor. Inténtalo de nuevo.'
+    }
   } finally {
     enviando.value = false
   }
@@ -29,28 +35,30 @@ async function enviar() {
 
 <template>
   <section class="auth">
-    <h1>Iniciar sesión</h1>
-    <form @submit.prevent="enviar">
+    <h1>Nueva contraseña</h1>
+
+    <template v-if="mensaje">
+      <p class="ok">{{ mensaje }}</p>
+      <RouterLink to="/login" class="btn">Iniciar sesión</RouterLink>
+    </template>
+
+    <form v-else @submit.prevent="enviar">
       <label>
-        Email
-        <input v-model="email" type="email" required autocomplete="email" />
-      </label>
-      <label>
-        Contraseña
-        <input v-model="password" type="password" required autocomplete="current-password" />
+        Contraseña nueva
+        <input
+          v-model="password"
+          type="password"
+          required
+          minlength="6"
+          autocomplete="new-password"
+          placeholder="Mínimo 6 caracteres"
+        />
       </label>
       <p v-if="error" class="error">{{ error }}</p>
       <button type="submit" :disabled="enviando">
-        {{ enviando ? 'Entrando...' : 'Entrar' }}
+        {{ enviando ? 'Guardando...' : 'Guardar contraseña' }}
       </button>
     </form>
-    <p class="cambio">
-      <RouterLink to="/recuperar">He olvidado mi contraseña</RouterLink>
-    </p>
-    <p class="cambio">
-      ¿No tienes cuenta?
-      <RouterLink to="/registro">Regístrate</RouterLink>
-    </p>
   </section>
 </template>
 
@@ -88,7 +96,8 @@ input:focus {
   outline: 2px solid #f1502f;
   border-color: transparent;
 }
-button {
+button,
+.btn {
   background: #f1502f;
   color: white;
   border: none;
@@ -97,21 +106,20 @@ button {
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
 }
 button:disabled {
   opacity: 0.6;
   cursor: default;
 }
+.ok {
+  color: #27ae60;
+  font-weight: bold;
+  margin-bottom: 20px;
+}
 .error {
   color: #c0392b;
   font-size: 0.95rem;
-}
-.cambio {
-  margin-top: 16px;
-  color: #555;
-}
-.cambio a {
-  color: #f1502f;
-  font-weight: bold;
 }
 </style>

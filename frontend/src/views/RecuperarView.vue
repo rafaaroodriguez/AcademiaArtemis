@@ -1,26 +1,21 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { useAuthStore } from '../stores/useAuth'
-
-const auth = useAuthStore()
-const router = useRouter()
-const route = useRoute()
+import { api } from '../lib/api'
 
 const email = ref('')
-const password = ref('')
+const mensaje = ref('')
 const error = ref('')
 const enviando = ref(false)
 
 async function enviar() {
+  mensaje.value = ''
   error.value = ''
   enviando.value = true
   try {
-    await auth.login(email.value, password.value)
-    // Si venía de una página privada, le devolvemos a ella
-    router.push((route.query.redirect as string) || '/')
-  } catch (e) {
-    error.value = (e as Error).message
+    const { data } = await api.post('/api/recuperar', { email: email.value })
+    mensaje.value = data.mensaje
+  } catch {
+    error.value = 'No se pudo conectar con el servidor. Inténtalo de nuevo.'
   } finally {
     enviando.value = false
   }
@@ -29,27 +24,26 @@ async function enviar() {
 
 <template>
   <section class="auth">
-    <h1>Iniciar sesión</h1>
-    <form @submit.prevent="enviar">
+    <h1>Recuperar contraseña</h1>
+    <p class="explicacion">
+      Escribe el email de tu cuenta y te enviaremos un enlace para crear una contraseña nueva.
+    </p>
+
+    <p v-if="mensaje" class="ok">{{ mensaje }}</p>
+
+    <form v-else @submit.prevent="enviar">
       <label>
         Email
         <input v-model="email" type="email" required autocomplete="email" />
       </label>
-      <label>
-        Contraseña
-        <input v-model="password" type="password" required autocomplete="current-password" />
-      </label>
       <p v-if="error" class="error">{{ error }}</p>
       <button type="submit" :disabled="enviando">
-        {{ enviando ? 'Entrando...' : 'Entrar' }}
+        {{ enviando ? 'Enviando...' : 'Enviar enlace' }}
       </button>
     </form>
+
     <p class="cambio">
-      <RouterLink to="/recuperar">He olvidado mi contraseña</RouterLink>
-    </p>
-    <p class="cambio">
-      ¿No tienes cuenta?
-      <RouterLink to="/registro">Regístrate</RouterLink>
+      <RouterLink to="/login">Volver a iniciar sesión</RouterLink>
     </p>
   </section>
 </template>
@@ -63,6 +57,10 @@ async function enviar() {
 }
 .auth h1 {
   font-size: 1.8rem;
+  margin-bottom: 12px;
+}
+.explicacion {
+  color: #555;
   margin-bottom: 24px;
 }
 form {
@@ -102,13 +100,16 @@ button:disabled {
   opacity: 0.6;
   cursor: default;
 }
+.ok {
+  color: #27ae60;
+  font-weight: bold;
+}
 .error {
   color: #c0392b;
   font-size: 0.95rem;
 }
 .cambio {
-  margin-top: 16px;
-  color: #555;
+  margin-top: 24px;
 }
 .cambio a {
   color: #f1502f;

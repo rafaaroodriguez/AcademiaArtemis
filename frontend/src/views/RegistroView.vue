@@ -49,6 +49,13 @@ async function enviar() {
           placeholder="Mínimo 6 caracteres"
         />
       </label>
+      <label class="acepto">
+        <input type="checkbox" required />
+        <span>
+          He leído y acepto la
+          <RouterLink to="/privacidad" target="_blank">política de privacidad</RouterLink>
+        </span>
+      </label>
       <p v-if="error" class="error">{{ error }}</p>
       <button type="submit" :disabled="enviando">
         {{ enviando ? 'Creando cuenta...' : 'Registrarme' }}
@@ -108,6 +115,16 @@ button {
 button:disabled {
   opacity: 0.6;
   cursor: default;
+}
+.acepto {
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 8px;
+  font-weight: normal;
+  color: #555;
+}
+.acepto a {
+  color: #f1502f;
 }
 .error {
   color: #c0392b;

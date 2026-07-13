@@ -1,5 +1,7 @@
 flask
 flask-cors
+python-dotenv
+stripe
 flask-sqlalchemy
 flask-jwt-extended
 gunicorn
