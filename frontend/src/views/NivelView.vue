@@ -4,11 +4,25 @@ import { useRoute } from 'vue-router'
 import { isAxiosError } from 'axios'
 import { api } from '../lib/api'
 
+interface Material {
+  id: number
+  tipo: 'apuntes' | 'ejercicios' | 'video' | 'enlace'
+  titulo: string
+  url: string
+}
+
 interface Tema {
   id: number
   titulo: string
   descripcion: string
-  material_url: string
+  materiales: Material[]
+}
+
+const iconos: Record<Material['tipo'], string> = {
+  apuntes: '📄',
+  ejercicios: '✏️',
+  video: '🎬',
+  enlace: '🔗',
 }
 
 interface Asignatura {
@@ -68,9 +82,18 @@ watch(() => route.params.id as string, cargar, { immediate: true })
             <div class="tema">
               <strong>{{ tema.titulo }}</strong>
               <p>{{ tema.descripcion }}</p>
-              <a v-if="tema.material_url" :href="tema.material_url" target="_blank" rel="noopener">
-                Abrir material
-              </a>
+              <div v-if="tema.materiales.length" class="materiales">
+                <a
+                  v-for="material in tema.materiales"
+                  :key="material.id"
+                  :href="material.url"
+                  target="_blank"
+                  rel="noopener"
+                  class="material"
+                >
+                  {{ iconos[material.tipo] }} {{ material.titulo }}
+                </a>
+              </div>
               <span v-else class="pronto">Material disponible próximamente</span>
             </div>
           </li>
@@ -133,9 +156,27 @@ ol {
   color: var(--texto-suave);
   margin: 6px 0;
 }
-.tema a {
+.materiales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.material {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   color: var(--marca);
-  font-weight: bold;
+  font-weight: 600;
+  font-size: 0.92rem;
+  text-decoration: none;
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  padding: 6px 14px;
+  transition: border-color 0.2s ease;
+}
+.material:hover {
+  border-color: var(--marca);
 }
 .pronto {
   color: var(--texto-suave);

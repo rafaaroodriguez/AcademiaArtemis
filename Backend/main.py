@@ -10,6 +10,7 @@ from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_migrate import Migrate, stamp, upgrade
 from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -49,6 +50,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 CORS(app)
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+migrate = Migrate(app, db)
 
 # Límite de intentos por IP en los endpoints sensibles (fuerza bruta).
 # En memoria: suficiente con un solo proceso; en producción con varios
@@ -66,13 +68,31 @@ def limite_alcanzado(_error):
     return jsonify({"error": "Demasiados intentos. Espera un minuto y vuelve a intentarlo"}), 429
 
 
+class Nivel(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(80), nullable=False)
+    precio = db.Column(db.Numeric(6, 2), nullable=False)
+    descripcion = db.Column(db.Text, default='')
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    creado_en = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+
+    def a_dict(self):
+        # Mantiene los nombres que el frontend ya consume (name/price/benefits)
+        return {
+            "id": self.id,
+            "name": self.nombre,
+            "price": float(self.precio),
+            "benefits": self.descripcion,
+        }
+
+
 class Usuario(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(80), nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(256), nullable=False)
-    # Nivel contratado (1=ESO, 2=Bachillerato, 3=Universidad); None = sin suscripción
-    nivel_id = db.Column(db.Integer, nullable=True)
+    # Nivel contratado; None = sin suscripción
+    nivel_id = db.Column(db.Integer, db.ForeignKey('nivel.id'), nullable=True)
     es_admin = db.Column(db.Boolean, nullable=False, default=False)
     # Identificadores de Stripe para gestionar la suscripción recurrente
     stripe_customer_id = db.Column(db.String(120), nullable=True)
@@ -93,10 +113,10 @@ class Usuario(db.Model):
 
 class Asignatura(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    # 1 = ESO, 2 = Bachillerato, 3 = Universidad (ids de datos_academia["niveles"])
-    nivel_id = db.Column(db.Integer, nullable=False)
+    nivel_id = db.Column(db.Integer, db.ForeignKey('nivel.id'), nullable=False, index=True)
     nombre = db.Column(db.String(120), nullable=False)
-    temas = db.relationship('Tema', backref='asignatura', order_by='Tema.orden')
+    temas = db.relationship('Tema', backref='asignatura', order_by='Tema.orden',
+                            cascade='all, delete-orphan')
 
     def a_dict(self):
         return {
@@ -108,19 +128,39 @@ class Asignatura(db.Model):
 
 class Tema(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    asignatura_id = db.Column(db.Integer, db.ForeignKey('asignatura.id'), nullable=False)
+    asignatura_id = db.Column(db.Integer, db.ForeignKey('asignatura.id'), nullable=False, index=True)
     orden = db.Column(db.Integer, nullable=False, default=0)
     titulo = db.Column(db.String(200), nullable=False)
     descripcion = db.Column(db.Text, default='')
-    # Enlace al material (PDF, vídeo...); de momento puede quedar vacío
-    material_url = db.Column(db.String(500), default='')
+    materiales = db.relationship('Material', backref='tema', order_by='Material.orden',
+                                 cascade='all, delete-orphan')
 
     def a_dict(self):
         return {
             "id": self.id,
             "titulo": self.titulo,
             "descripcion": self.descripcion,
-            "material_url": self.material_url,
+            "materiales": [material.a_dict() for material in self.materiales],
+        }
+
+
+class Material(db.Model):
+    TIPOS = ('apuntes', 'ejercicios', 'video', 'enlace')
+
+    id = db.Column(db.Integer, primary_key=True)
+    tema_id = db.Column(db.Integer, db.ForeignKey('tema.id'), nullable=False, index=True)
+    tipo = db.Column(db.String(20), nullable=False, default='enlace')
+    titulo = db.Column(db.String(200), nullable=False)
+    url = db.Column(db.String(500), nullable=False)
+    orden = db.Column(db.Integer, nullable=False, default=0)
+    creado_en = db.Column(db.DateTime, nullable=False, server_default=db.func.now())
+
+    def a_dict(self):
+        return {
+            "id": self.id,
+            "tipo": self.tipo,
+            "titulo": self.titulo,
+            "url": self.url,
         }
 
 
@@ -155,30 +195,49 @@ def cargar_contenido_de_ejemplo():
     db.session.commit()
 
 
-with app.app_context():
-    db.create_all()
-    # Mini-migraciones: añaden columnas nuevas a bases ya existentes
-    columnas = [c["name"] for c in db.inspect(db.engine).get_columns("usuario")]
-    with db.engine.connect() as conexion:
-        if "nivel_id" not in columnas:
-            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN nivel_id INTEGER"))
-        if "es_admin" not in columnas:
-            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN es_admin BOOLEAN NOT NULL DEFAULT 0"))
-        if "stripe_customer_id" not in columnas:
-            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN stripe_customer_id VARCHAR(120)"))
-        if "stripe_subscription_id" not in columnas:
-            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN stripe_subscription_id VARCHAR(120)"))
-        if "cancelacion_pendiente" not in columnas:
-            conexion.execute(db.text("ALTER TABLE usuario ADD COLUMN cancelacion_pendiente BOOLEAN NOT NULL DEFAULT 0"))
-        conexion.commit()
-    if Asignatura.query.count() == 0:
-        cargar_contenido_de_ejemplo()
-    # Si el email de ADMIN_EMAIL ya tiene cuenta, se le hace administrador
-    if ADMIN_EMAIL:
-        admin = Usuario.query.filter_by(email=ADMIN_EMAIL).first()
-        if admin and not admin.es_admin:
-            admin.es_admin = True
-            db.session.commit()
+def cargar_niveles_iniciales():
+    niveles = [
+        ("ESO", 4.99, "Acceso a contenido sobre cursos de ESO"),
+        ("Bachillerato", 9.99, "Acceso a contenido sobre cursos de Bachillerato"),
+        ("Universidad", 14.99, "Acceso a contenido sobre cursos de Universidad"),
+    ]
+    for orden, (nombre, precio, descripcion) in enumerate(niveles, start=1):
+        db.session.add(Nivel(nombre=nombre, precio=precio, descripcion=descripcion, orden=orden))
+    db.session.commit()
+
+
+def preparar_base_de_datos():
+    with app.app_context():
+        inspector = db.inspect(db.engine)
+        if not inspector.has_table('usuario'):
+            # Base vacía: se crea con el esquema actual y se marca como al día
+            db.create_all()
+            stamp()
+        elif not inspector.has_table('alembic_version'):
+            raise SystemExit(
+                "Esta base de datos es anterior al sistema de migraciones y no se puede "
+                "actualizar automáticamente. Al ser datos de desarrollo, borra el archivo "
+                "Backend/instance/academia.db (o crea una base nueva en Postgres) y vuelve a arrancar."
+            )
+        else:
+            # Base existente: aplica las migraciones pendientes
+            upgrade()
+
+        if Nivel.query.count() == 0:
+            cargar_niveles_iniciales()
+        if Asignatura.query.count() == 0:
+            cargar_contenido_de_ejemplo()
+        # Si el email de ADMIN_EMAIL ya tiene cuenta, se le hace administrador
+        if ADMIN_EMAIL:
+            admin = Usuario.query.filter_by(email=ADMIN_EMAIL).first()
+            if admin and not admin.es_admin:
+                admin.es_admin = True
+                db.session.commit()
+
+
+# SALTAR_BOOTSTRAP_DB=1 lo usan los comandos 'flask db ...' para generar migraciones
+if os.environ.get('SALTAR_BOOTSTRAP_DB') != '1':
+    preparar_base_de_datos()
 
 
 def usuario_del_token():
@@ -198,21 +257,14 @@ def requiere_admin(funcion):
     return envoltura
 
 
-datos_academia = {
-    "nombre": "Academia Artemis",
-    "biografia": "academia 100% online con contenido para todos los niveles: ESO, Bachillerato y Universidad!",
-    "niveles":
-        [
-            {"id": 1, "name": "ESO", "price": 4.99, "benefits": "Acceso a contenido sobre cursos de ESO"},
-            {"id": 2, "name": "Bachillerato", "price": 9.99, "benefits": "Acceso a contenido sobre cursos de Bachillerato"},
-            {"id": 3, "name": "Universidad", "price": 14.99, "benefits": "Acceso a contenido sobre cursos de Universidad"}
-        ],
-}
-
-
 @app.route('/api/datos_academia', methods=['GET'])
 def obtener_perfil():
-    return jsonify(datos_academia)
+    niveles = Nivel.query.order_by(Nivel.orden, Nivel.id).all()
+    return jsonify({
+        "nombre": "Academia Artemis",
+        "biografia": "academia 100% online con contenido para todos los niveles: ESO, Bachillerato y Universidad!",
+        "niveles": [nivel.a_dict() for nivel in niveles],
+    })
 
 
 @app.route('/api/registro', methods=['POST'])
@@ -263,7 +315,7 @@ def login():
 def crear_checkout():
     datos = request.get_json(silent=True) or {}
     nivel_id = datos.get('nivel_id')
-    nivel = next((n for n in datos_academia["niveles"] if n["id"] == nivel_id), None)
+    nivel = db.session.get(Nivel, nivel_id) if isinstance(nivel_id, int) else None
     if not nivel:
         return jsonify({"error": "Ese nivel no existe"}), 404
 
@@ -285,9 +337,9 @@ def crear_checkout():
                 'quantity': 1,
                 'price_data': {
                     'currency': 'eur',
-                    'unit_amount': int(round(nivel['price'] * 100)),
+                    'unit_amount': int(round(float(nivel.precio) * 100)),
                     'recurring': {'interval': 'month'},
-                    'product_data': {'name': f"Plan {nivel['name']} · Academia Artemis"},
+                    'product_data': {'name': f"Plan {nivel.nombre} · Academia Artemis"},
                 },
             }],
             metadata={'usuario_id': str(usuario.id), 'nivel_id': str(nivel_id)},
@@ -343,7 +395,7 @@ def confirmar_checkout():
 @app.route('/api/niveles/<int:nivel_id>/contenido', methods=['GET'])
 @jwt_required()
 def contenido_nivel(nivel_id):
-    nivel = next((n for n in datos_academia["niveles"] if n["id"] == nivel_id), None)
+    nivel = db.session.get(Nivel, nivel_id)
     if not nivel:
         return jsonify({"error": "Ese nivel no existe"}), 404
 
@@ -355,7 +407,7 @@ def contenido_nivel(nivel_id):
 
     asignaturas = Asignatura.query.filter_by(nivel_id=nivel_id).order_by(Asignatura.nombre).all()
     return jsonify({
-        "nivel": nivel,
+        "nivel": nivel.a_dict(),
         "asignaturas": [a.a_dict() for a in asignaturas],
     })
 
@@ -555,13 +607,38 @@ def admin_borrar_alumno(alumno_id):
     return jsonify({"ok": True})
 
 
+@app.route('/api/admin/niveles/<int:nivel_id>', methods=['PUT'])
+@requiere_admin
+def admin_editar_nivel(nivel_id):
+    nivel = db.session.get(Nivel, nivel_id)
+    if not nivel:
+        return jsonify({"error": "Ese nivel no existe"}), 404
+    datos = request.get_json(silent=True) or {}
+
+    nombre = (datos.get('nombre') or '').strip()
+    if not nombre:
+        return jsonify({"error": "El nombre no puede estar vacío"}), 400
+    try:
+        precio = round(float(datos.get('precio')), 2)
+    except (TypeError, ValueError):
+        return jsonify({"error": "El precio debe ser un número"}), 400
+    if precio <= 0:
+        return jsonify({"error": "El precio debe ser mayor que cero"}), 400
+
+    nivel.nombre = nombre
+    nivel.precio = precio
+    nivel.descripcion = (datos.get('descripcion') or '').strip()
+    db.session.commit()
+    return jsonify({"nivel": nivel.a_dict()})
+
+
 @app.route('/api/admin/asignaturas', methods=['POST'])
 @requiere_admin
 def admin_crear_asignatura():
     datos = request.get_json(silent=True) or {}
     nombre = (datos.get('nombre') or '').strip()
     nivel_id = datos.get('nivel_id')
-    if not nombre or not any(n["id"] == nivel_id for n in datos_academia["niveles"]):
+    if not nombre or not (isinstance(nivel_id, int) and db.session.get(Nivel, nivel_id)):
         return jsonify({"error": "Hacen falta un nombre y un nivel válido"}), 400
     asignatura = Asignatura(nivel_id=nivel_id, nombre=nombre)
     db.session.add(asignatura)
@@ -589,8 +666,7 @@ def admin_borrar_asignatura(asignatura_id):
     asignatura = db.session.get(Asignatura, asignatura_id)
     if not asignatura:
         return jsonify({"error": "Esa asignatura no existe"}), 404
-    for tema in asignatura.temas:
-        db.session.delete(tema)
+    # El cascade de las relaciones arrastra sus temas y materiales
     db.session.delete(asignatura)
     db.session.commit()
     return jsonify({"ok": True})
@@ -612,7 +688,6 @@ def admin_crear_tema(asignatura_id):
         orden=ultimo_orden + 1,
         titulo=titulo,
         descripcion=(datos.get('descripcion') or '').strip(),
-        material_url=(datos.get('material_url') or '').strip(),
     )
     db.session.add(tema)
     db.session.commit()
@@ -631,7 +706,6 @@ def admin_editar_tema(tema_id):
         return jsonify({"error": "El título es obligatorio"}), 400
     tema.titulo = titulo
     tema.descripcion = (datos.get('descripcion') or '').strip()
-    tema.material_url = (datos.get('material_url') or '').strip()
     db.session.commit()
     return jsonify({"tema": tema.a_dict()})
 
@@ -653,6 +727,39 @@ def admin_mover_tema(tema_id):
         return jsonify({"error": "El tema ya está en el extremo"}), 400
 
     tema.orden, hermanos[vecino].orden = hermanos[vecino].orden, tema.orden
+    db.session.commit()
+    return jsonify({"ok": True})
+
+
+@app.route('/api/admin/temas/<int:tema_id>/materiales', methods=['POST'])
+@requiere_admin
+def admin_crear_material(tema_id):
+    tema = db.session.get(Tema, tema_id)
+    if not tema:
+        return jsonify({"error": "Ese tema no existe"}), 404
+    datos = request.get_json(silent=True) or {}
+    titulo = (datos.get('titulo') or '').strip()
+    url = (datos.get('url') or '').strip()
+    tipo = (datos.get('tipo') or 'enlace').strip()
+    if not titulo or not url:
+        return jsonify({"error": "El título y la URL son obligatorios"}), 400
+    if tipo not in Material.TIPOS:
+        return jsonify({"error": f"El tipo debe ser uno de: {', '.join(Material.TIPOS)}"}), 400
+
+    ultimo_orden = max((m.orden for m in tema.materiales), default=0)
+    material = Material(tema_id=tema_id, tipo=tipo, titulo=titulo, url=url, orden=ultimo_orden + 1)
+    db.session.add(material)
+    db.session.commit()
+    return jsonify({"material": material.a_dict()}), 201
+
+
+@app.route('/api/admin/materiales/<int:material_id>', methods=['DELETE'])
+@requiere_admin
+def admin_borrar_material(material_id):
+    material = db.session.get(Material, material_id)
+    if not material:
+        return jsonify({"error": "Ese material no existe"}), 404
+    db.session.delete(material)
     db.session.commit()
     return jsonify({"ok": True})
 

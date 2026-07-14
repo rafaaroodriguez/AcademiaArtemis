@@ -5,11 +5,18 @@ import { api } from '../lib/api'
 import { useAcademyStore } from '../stores/useAcademy'
 import type { Usuario } from '../stores/useAuth'
 
+interface Material {
+  id: number
+  tipo: string
+  titulo: string
+  url: string
+}
+
 interface Tema {
   id: number
   titulo: string
   descripcion: string
-  material_url: string
+  materiales: Material[]
 }
 
 interface Asignatura {
@@ -96,14 +103,72 @@ async function crearTema(asignaturaId: number) {
 }
 
 const editandoTema = ref<number | null>(null)
-const formEdicion = ref({ titulo: '', descripcion: '', material_url: '' })
+const formEdicion = ref({ titulo: '', descripcion: '' })
 
 function empezarEdicion(tema: Tema) {
   editandoTema.value = tema.id
   formEdicion.value = {
     titulo: tema.titulo,
     descripcion: tema.descripcion,
-    material_url: tema.material_url,
+  }
+}
+
+// --- Niveles y precios ---
+const formNiveles = ref<Record<number, { nombre: string; precio: number; descripcion: string }>>({})
+const nivelGuardado = ref(0)
+
+function prepararFormNiveles() {
+  for (const tier of academy.tiers) {
+    formNiveles.value[tier.id] = {
+      nombre: tier.name,
+      precio: tier.price,
+      descripcion: tier.benefits,
+    }
+  }
+}
+
+async function guardarNivel(nivelId: number) {
+  error.value = ''
+  nivelGuardado.value = 0
+  try {
+    await api.put(`/api/admin/niveles/${nivelId}`, formNiveles.value[nivelId])
+    await academy.fetchInfo()
+    prepararFormNiveles()
+    nivelGuardado.value = nivelId
+  } catch (e) {
+    error.value = mensaje(e)
+  }
+}
+
+// --- Materiales de un tema ---
+const nuevoMaterial = ref<Record<number, { tipo: string; titulo: string; url: string }>>({})
+
+function formMaterial(temaId: number) {
+  if (!nuevoMaterial.value[temaId]) {
+    nuevoMaterial.value[temaId] = { tipo: 'apuntes', titulo: '', url: '' }
+  }
+  return nuevoMaterial.value[temaId]
+}
+
+async function crearMaterial(temaId: number) {
+  error.value = ''
+  try {
+    await api.post(`/api/admin/temas/${temaId}/materiales`, nuevoMaterial.value[temaId])
+    nuevoMaterial.value[temaId] = { tipo: 'apuntes', titulo: '', url: '' }
+    await cargarContenido()
+  } catch (e) {
+    error.value = mensaje(e)
+  }
+}
+
+async function borrarMaterial(materialId: number) {
+  if (!confirm('¿Borrar este material?')) return
+  error.value = ''
+  try {
+    await api.delete(`/api/admin/materiales/${materialId}`)
+    await cargarContenido()
+  } catch (e) {
+    error.value = mensaje(e)
   }
 }
 
@@ -169,6 +234,10 @@ function nombreNivel(id: number | null): string {
 onMounted(async () => {
   try {
     await Promise.all([cargarAlumnos(), cargarContenido()])
+    if (!academy.tiers.length) {
+      await academy.fetchInfo()
+    }
+    prepararFormNiveles()
   } catch (e) {
     error.value = mensaje(e)
   }
@@ -207,6 +276,38 @@ onMounted(async () => {
     </div>
 
     <div class="panel">
+      <h2>Niveles y precios</h2>
+      <form
+        v-for="tier in academy.tiers"
+        :key="tier.id"
+        class="fila-nivel"
+        @submit.prevent="guardarNivel(tier.id)"
+      >
+        <template v-if="formNiveles[tier.id]">
+          <input v-model="formNiveles[tier.id]!.nombre" class="campo-nombre" required />
+          <div class="campo-precio">
+            <input
+              v-model.number="formNiveles[tier.id]!.precio"
+              type="number"
+              step="0.01"
+              min="0.01"
+              required
+            />
+            <span>€/mes</span>
+          </div>
+          <input
+            v-model="formNiveles[tier.id]!.descripcion"
+            class="campo-descripcion"
+            placeholder="Descripción del plan"
+          />
+          <button type="submit" class="guardar">
+            {{ nivelGuardado === tier.id ? 'Guardado ✓' : 'Guardar' }}
+          </button>
+        </template>
+      </form>
+    </div>
+
+    <div class="panel">
       <h2>Temario</h2>
       <div class="niveles">
         <button
@@ -228,26 +329,46 @@ onMounted(async () => {
           </div>
         </div>
         <ul>
-          <li v-for="(tema, indice) in asignatura.temas" :key="tema.id">
+          <li v-for="(tema, indice) in asignatura.temas" :key="tema.id" class="tema-fila">
             <template v-if="editandoTema !== tema.id">
-              <span>{{ tema.titulo }}</span>
-              <div class="botones">
-                <button class="accion" :disabled="indice === 0" @click="moverTema(tema.id, 'subir')">↑</button>
-                <button
-                  class="accion"
-                  :disabled="indice === asignatura.temas.length - 1"
-                  @click="moverTema(tema.id, 'bajar')"
-                >
-                  ↓
-                </button>
-                <button class="accion" @click="empezarEdicion(tema)">Editar</button>
-                <button class="borrar" @click="borrarTema(tema.id)">Borrar</button>
+              <div class="tema-linea">
+                <span>{{ tema.titulo }}</span>
+                <div class="botones">
+                  <button class="accion" :disabled="indice === 0" @click="moverTema(tema.id, 'subir')">↑</button>
+                  <button
+                    class="accion"
+                    :disabled="indice === asignatura.temas.length - 1"
+                    @click="moverTema(tema.id, 'bajar')"
+                  >
+                    ↓
+                  </button>
+                  <button class="accion" @click="empezarEdicion(tema)">Editar</button>
+                  <button class="borrar" @click="borrarTema(tema.id)">Borrar</button>
+                </div>
+              </div>
+              <div class="materiales-admin">
+                <span v-for="material in tema.materiales" :key="material.id" class="chip">
+                  {{ material.tipo }} · {{ material.titulo }}
+                  <button class="chip-borrar" title="Borrar material" @click="borrarMaterial(material.id)">
+                    ×
+                  </button>
+                </span>
+                <form class="nuevo-material" @submit.prevent="crearMaterial(tema.id)">
+                  <select v-model="formMaterial(tema.id).tipo">
+                    <option value="apuntes">Apuntes</option>
+                    <option value="ejercicios">Ejercicios</option>
+                    <option value="video">Vídeo</option>
+                    <option value="enlace">Enlace</option>
+                  </select>
+                  <input v-model="formMaterial(tema.id).titulo" placeholder="Título del material" required />
+                  <input v-model="formMaterial(tema.id).url" placeholder="URL" type="url" required />
+                  <button type="submit" class="accion">Añadir material</button>
+                </form>
               </div>
             </template>
             <form v-else class="edicion" @submit.prevent="guardarTema(tema.id)">
               <input v-model="formEdicion.titulo" placeholder="Título" required />
               <input v-model="formEdicion.descripcion" placeholder="Descripción (opcional)" />
-              <input v-model="formEdicion.material_url" placeholder="URL del material (opcional)" />
               <div class="botones">
                 <button type="submit" class="guardar">Guardar</button>
                 <button type="button" class="accion" @click="editandoTema = null">Cancelar</button>
@@ -359,11 +480,88 @@ ul {
   margin: 12px 0;
 }
 li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--borde);
+}
+.tema-linea {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 6px 0;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.materiales-admin {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  padding-left: 8px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--fondo-suave);
+  border: 1px solid var(--borde);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 0.82rem;
+  color: var(--texto-suave);
+}
+.chip-borrar {
+  background: transparent;
+  border: none;
+  color: var(--texto-suave);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0;
+}
+.chip-borrar:hover {
+  color: #c0392b;
+}
+.nuevo-material {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.nuevo-material select,
+.nuevo-material input {
+  padding: 5px 8px;
+  border: 1px solid var(--borde);
+  border-radius: 6px;
+  font-size: 0.85rem;
+}
+.fila-nivel {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: 10px 0;
   border-bottom: 1px solid var(--borde);
+}
+.fila-nivel input {
+  padding: 8px 10px;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+}
+.campo-nombre {
+  width: 150px;
+}
+.campo-precio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--texto-suave);
+}
+.campo-precio input {
+  width: 90px;
+}
+.campo-descripcion {
+  flex: 1;
+  min-width: 200px;
 }
 .botones {
   display: flex;

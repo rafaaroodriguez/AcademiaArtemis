@@ -1,6 +1,7 @@
 flask
 flask-cors
 flask-limiter
+flask-migrate
 psycopg2-binary
 python-dotenv
 stripe

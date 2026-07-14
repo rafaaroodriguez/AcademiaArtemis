@@ -110,7 +110,7 @@ def test_gestion_del_temario(cliente):
     assert cliente.put(f'/api/admin/asignaturas/{asignatura_id}', json={'nombre': 'Inglés B1'},
                        headers=autorizado(token)).status_code == 200
     assert cliente.put(f"/api/admin/temas/{tema_a['id']}",
-                       json={'titulo': 'Tema A editado', 'descripcion': 'x', 'material_url': ''},
+                       json={'titulo': 'Tema A editado', 'descripcion': 'x'},
                        headers=autorizado(token)).status_code == 200
 
     # Mover: A estaba primero; tras bajar, queda segundo
@@ -121,6 +121,78 @@ def test_gestion_del_temario(cliente):
                         headers=autorizado(token)).status_code == 400
 
     # Borrar la asignatura arrastra sus temas
+    assert cliente.delete(f'/api/admin/asignaturas/{asignatura_id}',
+                          headers=autorizado(token)).status_code == 200
+
+
+def test_editar_nivel_y_precio(cliente):
+    registrar(cliente, 'admin@test.com', nombre='Admin')
+    token = token_de(cliente, 'admin@test.com')
+
+    respuesta = cliente.put('/api/admin/niveles/1',
+                            json={'nombre': 'ESO', 'precio': 5.49, 'descripcion': 'Todo ESO'},
+                            headers=autorizado(token))
+    assert respuesta.status_code == 200
+
+    # El cambio se refleja en los datos públicos de la academia
+    niveles = cliente.get('/api/datos_academia').get_json()['niveles']
+    eso = next(n for n in niveles if n['id'] == 1)
+    assert eso['price'] == 5.49
+    assert eso['benefits'] == 'Todo ESO'
+
+    # Validaciones
+    assert cliente.put('/api/admin/niveles/1', json={'nombre': 'ESO', 'precio': 'gratis'},
+                       headers=autorizado(token)).status_code == 400
+    assert cliente.put('/api/admin/niveles/1', json={'nombre': 'ESO', 'precio': -1},
+                       headers=autorizado(token)).status_code == 400
+    assert cliente.put('/api/admin/niveles/99', json={'nombre': 'X', 'precio': 1},
+                       headers=autorizado(token)).status_code == 404
+
+    # Un usuario normal no puede
+    registrar(cliente, 'raso@test.com')
+    token_raso = token_de(cliente, 'raso@test.com')
+    assert cliente.put('/api/admin/niveles/1', json={'nombre': 'Hack', 'precio': 0.01},
+                       headers=autorizado(token_raso)).status_code == 403
+
+
+def test_materiales_de_un_tema(cliente):
+    registrar(cliente, 'admin@test.com', nombre='Admin')
+    token = token_de(cliente, 'admin@test.com')
+
+    asignatura_id = cliente.post('/api/admin/asignaturas', json={'nivel_id': 1, 'nombre': 'Historia'},
+                                 headers=autorizado(token)).get_json()['asignatura']['id']
+    tema_id = cliente.post(f'/api/admin/asignaturas/{asignatura_id}/temas', json={'titulo': 'La Edad Media'},
+                           headers=autorizado(token)).get_json()['tema']['id']
+
+    # Añadir un vídeo y unos apuntes
+    respuesta = cliente.post(f'/api/admin/temas/{tema_id}/materiales',
+                             json={'tipo': 'video', 'titulo': 'Clase en vídeo', 'url': 'https://youtu.be/x'},
+                             headers=autorizado(token))
+    assert respuesta.status_code == 201
+    material_id = respuesta.get_json()['material']['id']
+    assert cliente.post(f'/api/admin/temas/{tema_id}/materiales',
+                        json={'tipo': 'apuntes', 'titulo': 'Apuntes del tema', 'url': 'https://drive.x/y'},
+                        headers=autorizado(token)).status_code == 201
+
+    # Tipo inválido y campos vacíos rechazados
+    assert cliente.post(f'/api/admin/temas/{tema_id}/materiales',
+                        json={'tipo': 'podcast', 'titulo': 'X', 'url': 'https://x'},
+                        headers=autorizado(token)).status_code == 400
+    assert cliente.post(f'/api/admin/temas/{tema_id}/materiales',
+                        json={'tipo': 'video', 'titulo': '', 'url': ''},
+                        headers=autorizado(token)).status_code == 400
+
+    # El contenido del nivel devuelve los materiales en orden
+    contenido = cliente.get('/api/niveles/1/contenido', headers=autorizado(token)).get_json()
+    historia = next(a for a in contenido['asignaturas'] if a['nombre'] == 'Historia')
+    materiales = historia['temas'][0]['materiales']
+    assert [m['tipo'] for m in materiales] == ['video', 'apuntes']
+
+    # Borrar un material
+    assert cliente.delete(f'/api/admin/materiales/{material_id}',
+                          headers=autorizado(token)).status_code == 200
+
+    # Borrar la asignatura arrastra temas y materiales sin errores
     assert cliente.delete(f'/api/admin/asignaturas/{asignatura_id}',
                           headers=autorizado(token)).status_code == 200
 
